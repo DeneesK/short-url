@@ -93,6 +93,7 @@ func TestURLHandler(t *testing.T) {
 			handlers.URLHandler(&test.rep)(w, request)
 
 			res := w.Result()
+			defer res.Body.Close()
 
 			assert.Equal(t, test.want.code, res.StatusCode)
 
