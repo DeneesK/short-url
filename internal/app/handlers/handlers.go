@@ -44,6 +44,11 @@ func URLHandler(urlSaver URLRepository) http.HandlerFunc {
 		}
 		defer r.Body.Close()
 
+		if string(body) == "" {
+			http.Error(w, "body must have url", http.StatusBadRequest)
+			return
+		}
+
 		id, err := urlSaver.SaveURL(string(body))
 		if err != nil {
 			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())

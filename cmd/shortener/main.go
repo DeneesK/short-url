@@ -9,10 +9,10 @@ import (
 )
 
 func main() {
-	s := repository.NewRepository()
-	r := router.NewRouter(s)
+	rep := repository.NewRepository()
+	router := router.NewRouter(rep)
 
-	if err := http.ListenAndServe(":8080", r); err != nil {
+	if err := http.ListenAndServe(":8080", router); err != nil {
 		log.Fatal(err)
 	}
 }
