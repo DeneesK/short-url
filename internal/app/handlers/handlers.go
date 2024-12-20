@@ -7,14 +7,14 @@ import (
 	"strings"
 )
 
-const baseRespUrl = "http://localhost:8080/"
+const baseRespURL = "http://localhost:8080/"
 
 type URLRepository interface {
-	SaveUrl(string) (string, error)
-	GetUrl(string) (string, error)
+	SaveURL(string) (string, error)
+	GetURL(string) (string, error)
 }
 
-func UrlHandler(urlSaver URLRepository) http.HandlerFunc {
+func URLHandler(urlSaver URLRepository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			parts := strings.Split(r.URL.Path, "/")
@@ -26,7 +26,7 @@ func UrlHandler(urlSaver URLRepository) http.HandlerFunc {
 
 			id := parts[1]
 
-			url, err := urlSaver.GetUrl(id)
+			url, err := urlSaver.GetURL(id)
 			if err != nil {
 				errorString := fmt.Sprintf("failed to redirect: %s", err.Error())
 				http.Error(w, errorString, http.StatusBadRequest)
@@ -44,17 +44,17 @@ func UrlHandler(urlSaver URLRepository) http.HandlerFunc {
 		}
 		defer r.Body.Close()
 
-		id, err := urlSaver.SaveUrl(string(body))
+		id, err := urlSaver.SaveURL(string(body))
 		if err != nil {
 			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())
 			http.Error(w, errorString, http.StatusBadRequest)
 			return
 		}
 
-		shortUrl := baseRespUrl + id
+		shortURL := baseRespURL + id
 
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte(shortUrl))
+		w.Write([]byte(shortURL))
 	}
 }

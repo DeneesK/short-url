@@ -7,13 +7,13 @@ import (
 )
 
 type Repository interface {
-	SaveUrl(string) (string, error)
-	GetUrl(string) (string, error)
+	SaveURL(string) (string, error)
+	GetURL(string) (string, error)
 }
 
 func NewRouter(rep Repository) *http.ServeMux {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/", handlers.UrlHandler(rep))
+	mux.HandleFunc("/", handlers.URLHandler(rep))
 	return mux
 }
