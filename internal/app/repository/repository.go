@@ -21,11 +21,11 @@ type Repository struct {
 func (r *Repository) SaveURL(u string) (string, error) {
 	id := random.RandomString(idLength)
 	r.storage.Save(id, u)
-	shortUrl, err := url.JoinPath(r.baseAddr, id)
+	shortURL, err := url.JoinPath(r.baseAddr, id)
 	if err != nil {
 		return "", err
 	}
-	return shortUrl, nil
+	return shortURL, nil
 }
 
 func (r *Repository) GetURL(id string) (string, error) {
