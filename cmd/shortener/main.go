@@ -13,9 +13,9 @@ import (
 func main() {
 	conf := conf.MustLoad()
 	storage := storage.NewMemoryStorage()
-	rep := repository.NewRepository(storage, conf.BaseAddr)
+	rep := repository.NewRepository(storage, conf.BaseURL)
 	router := router.NewRouter(rep)
-	if err := http.ListenAndServe(conf.Addr, router); err != nil {
+	if err := http.ListenAndServe(conf.ServerAddr, router); err != nil {
 		log.Fatal(err)
 	}
 }
