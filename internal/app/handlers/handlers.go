@@ -8,8 +8,6 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-const baseRespURL = "http://localhost:8080/"
-
 type URLRepository interface {
 	SaveURL(string) (string, error)
 	GetURL(string) (string, error)
@@ -29,14 +27,12 @@ func URLSaver(urlSaver URLRepository) http.HandlerFunc {
 			return
 		}
 
-		id, err := urlSaver.SaveURL(string(body))
+		shortURL, err := urlSaver.SaveURL(string(body))
 		if err != nil {
 			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())
 			http.Error(w, errorString, http.StatusBadRequest)
 			return
 		}
-
-		shortURL := baseRespURL + id
 
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusCreated)

@@ -2,6 +2,7 @@ package repository
 
 import (
 	"fmt"
+	"net/url"
 
 	"github.com/DeneesK/short-url/internal/pkg/random"
 )
@@ -14,13 +15,18 @@ type Storage interface {
 }
 
 type Repository struct {
-	storage Storage
+	storage  Storage
+	baseAddr string
 }
 
-func (r *Repository) SaveURL(url string) (string, error) {
+func (r *Repository) SaveURL(u string) (string, error) {
 	id := random.RandomString(idLength)
-	r.storage.Save(id, url)
-	return id, nil
+	r.storage.Save(id, u)
+	shortUrl, err := url.JoinPath(r.baseAddr, id)
+	if err != nil {
+		return "", err
+	}
+	return shortUrl, nil
 }
 
 func (r *Repository) GetURL(id string) (string, error) {
@@ -31,8 +37,9 @@ func (r *Repository) GetURL(id string) (string, error) {
 	return url, nil
 }
 
-func NewRepository(storage Storage) *Repository {
+func NewRepository(storage Storage, baseAddr string) *Repository {
 	return &Repository{
-		storage: storage,
+		storage:  storage,
+		baseAddr: baseAddr,
 	}
 }
