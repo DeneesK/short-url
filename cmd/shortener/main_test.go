@@ -2,106 +2,113 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 
-	"github.com/DeneesK/short-url/internal/app/handlers"
+	"github.com/DeneesK/short-url/internal/app/router"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-type rep struct {
+const testID = "test-id"
+
+type repositoryMock struct {
+	m       sync.RWMutex
+	storage map[string]string
 }
 
-func (r *rep) SaveURL(url string) (string, error) {
-	return "id", nil
+func (r *repositoryMock) SaveURL(value string) (string, error) {
+	r.m.Lock()
+	defer r.m.Unlock()
+	r.storage[testID] = value
+	return testID, nil
 }
 
-func (r *rep) GetURL(id string) (string, error) {
-	return "example.com", nil
-}
-
-func TestURLHandler(t *testing.T) {
-	type want struct {
-		code        int
-		response    string
-		contentType string
+func (r *repositoryMock) GetURL(id string) (string, error) {
+	r.m.RLock()
+	defer r.m.RUnlock()
+	v, ok := r.storage[id]
+	if !ok {
+		return "", fmt.Errorf("url not found by id: %v", id)
 	}
-	tests := []struct {
-		name    string
-		urlPath string
-		body    []byte
-		method  string
-		want    want
-		rep     rep
+	return v, nil
+}
+
+func testRequest(t *testing.T, ts *httptest.Server, method,
+	path string, body []byte) (*http.Response, string) {
+	req, err := http.NewRequest(method, ts.URL+path, bytes.NewReader(body))
+	require.NoError(t, err)
+
+	resp, err := ts.Client().Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	return resp, string(respBody)
+}
+
+func TestRouter(t *testing.T) {
+	rep := &repositoryMock{storage: make(map[string]string)}
+	r := router.NewRouter(rep)
+	ts := httptest.NewServer(r)
+	defer ts.Close()
+
+	type want struct {
+		code int
+	}
+
+	var testTable = []struct {
+		name   string
+		url    string
+		method string
+		body   []byte
+		want   want
 	}{
 		{
-			name:    "create new short url",
-			urlPath: "/",
-			method:  http.MethodPost,
-			body:    []byte("example.com"),
+			name:   "post '/'",
+			url:    "/",
+			method: http.MethodPost,
+			body:   []byte("http://example.com"),
 			want: want{
-				code:        http.StatusCreated,
-				response:    "http://localhost:8080/id",
-				contentType: "text/plain",
+				code: http.StatusCreated,
 			},
-			rep: rep{},
 		},
 		{
-			name:    "create new short url with empty body",
-			urlPath: "/",
-			method:  http.MethodPost,
+			name:   "get '/{id}'",
+			url:    "/test-id",
+			method: http.MethodGet,
 			want: want{
-				code:        http.StatusBadRequest,
-				response:    "body must have url\n",
-				contentType: "text/plain; charset=utf-8",
+				code: http.StatusOK,
 			},
-			rep: rep{},
 		},
 		{
-			name:    "redirect with id",
-			urlPath: "/id",
-			method:  http.MethodGet,
+			name:   "post '/' empty body",
+			url:    "/",
+			method: http.MethodPost,
 			want: want{
-				code:        http.StatusTemporaryRedirect,
-				response:    "<a href=\"/example.com\">Temporary Redirect</a>.\n\n",
-				contentType: "text/html; charset=utf-8",
+				code: http.StatusBadRequest,
 			},
-			rep: rep{},
 		},
 		{
-			name:    "redirect without id",
-			urlPath: "/",
-			method:  http.MethodGet,
+			name:   "get '/{id}' with wrong id",
+			url:    "/wrong-id",
+			method: http.MethodGet,
 			want: want{
-				code:        http.StatusBadRequest,
-				response:    "ID not provided\n",
-				contentType: "text/plain; charset=utf-8",
+				code: http.StatusBadRequest,
 			},
-			rep: rep{},
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			reader := bytes.NewReader(test.body)
-			request := httptest.NewRequest(test.method, test.urlPath, reader)
-			w := httptest.NewRecorder()
-
-			handlers.URLHandler(&test.rep)(w, request)
-
-			res := w.Result()
-			defer res.Body.Close()
-
-			assert.Equal(t, test.want.code, res.StatusCode)
-
-			resBody, err := io.ReadAll(res.Body)
-
-			require.NoError(t, err)
-			assert.Equal(t, test.want.response, string(resBody))
-			assert.Equal(t, test.want.contentType, res.Header.Get("Content-Type"))
+	for _, v := range testTable {
+		t.Run(v.name, func(t *testing.T) {
+			resp, _ := testRequest(t, ts, v.method, v.url, v.body)
+			assert.Equal(t, v.want.code, resp.StatusCode)
 		})
 	}
 }

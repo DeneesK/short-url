@@ -1,9 +1,8 @@
 package router
 
 import (
-	"net/http"
-
 	"github.com/DeneesK/short-url/internal/app/handlers"
+	"github.com/go-chi/chi/v5"
 )
 
 type Repository interface {
@@ -11,9 +10,9 @@ type Repository interface {
 	GetURL(string) (string, error)
 }
 
-func NewRouter(rep Repository) *http.ServeMux {
-	mux := http.NewServeMux()
-
-	mux.HandleFunc("/", handlers.URLHandler(rep))
-	return mux
+func NewRouter(rep Repository) *chi.Mux {
+	r := chi.NewRouter()
+	r.Post("/", handlers.URLSaver(rep))
+	r.Get("/{id}", handlers.URLRedirect(rep))
+	return r
 }
