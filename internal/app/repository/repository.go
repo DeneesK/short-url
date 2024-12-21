@@ -1,7 +1,6 @@
 package repository
 
 import (
-	"fmt"
 	"net/url"
 
 	"github.com/DeneesK/short-url/internal/pkg/random"
@@ -32,7 +31,7 @@ func (r *Repository) SaveURL(u string) (string, error) {
 func (r *Repository) GetURL(id string) (string, error) {
 	url, err := r.storage.Get(id)
 	if err != nil {
-		return "", fmt.Errorf("url not found by id: %v", id)
+		return "", err
 	}
 	return url, nil
 }
