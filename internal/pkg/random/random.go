@@ -2,18 +2,17 @@ package random
 
 import (
 	"math/rand/v2"
-	"unicode"
 )
 
+const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
 func RandomString(length int) string {
-	str := make([]rune, length)
+	str := make([]byte, length)
+
 	for i := 0; i < length; i++ {
-		s := rune(rand.Int32N(127))
-		if unicode.IsLetter(s) {
-			str[i] = s
-			continue
-		}
-		i--
+		j := rand.IntN(len(letters))
+		str[i] = letters[j]
 	}
+
 	return string(str)
 }

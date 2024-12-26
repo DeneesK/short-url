@@ -55,7 +55,7 @@ func testRequest(t *testing.T, ts *httptest.Server, method,
 
 func TestRouter(t *testing.T) {
 	rep := &repositoryMock{storage: make(map[string]string)}
-	r := router.NewRouter(rep)
+	r := router.NewRouter(rep, 100)
 	ts := httptest.NewServer(r)
 	defer ts.Close()
 

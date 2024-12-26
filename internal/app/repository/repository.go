@@ -9,7 +9,7 @@ import (
 const idLength = 8
 
 type Storage interface {
-	Save(id, value string) (string, error)
+	Save(id, value string) error
 	Get(id string) (string, error)
 }
 
@@ -19,9 +19,14 @@ type Repository struct {
 }
 
 func (r *Repository) SaveURL(u string) (string, error) {
-	id := random.RandomString(idLength)
-	r.storage.Save(id, u)
-	shortURL, err := url.JoinPath(r.baseAddr, id)
+	alias := random.RandomString(idLength)
+
+	err := r.storage.Save(alias, u)
+	if err != nil {
+		return "", err
+	}
+
+	shortURL, err := url.JoinPath(r.baseAddr, alias)
 	if err != nil {
 		return "", err
 	}

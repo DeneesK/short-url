@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/DeneesK/short-url/internal/pkg/validator"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -22,12 +23,14 @@ func URLSaver(urlSaver URLRepository) http.HandlerFunc {
 		}
 		defer r.Body.Close()
 
-		if string(body) == "" {
-			http.Error(w, "body must have url", http.StatusBadRequest)
+		url := string(body)
+
+		if isValid := validator.IsValidURL(url); !isValid {
+			http.Error(w, "body must have valid url", http.StatusBadRequest)
 			return
 		}
 
-		shortURL, err := urlSaver.SaveURL(string(body))
+		shortURL, err := urlSaver.SaveURL(url) // Добавил проверку выше
 		if err != nil {
 			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())
 			http.Error(w, errorString, http.StatusBadRequest)
