@@ -18,7 +18,7 @@ func MustLoad() *ServerConf {
 	var cfg ServerConf
 	flag.StringVar(&cfg.ServerAddr, "a", "localhost:8080", "address and port to run server")
 	flag.StringVar(&cfg.BaseURL, "b", "http://localhost:8080", "base address of the resulting shortened URL")
-	flag.Float64Var(&cfg.MemoryUsageLimit, "mem-limit", 80, "memory usage limit in percents 0 <= mem-limit >=")
+	flag.Float64Var(&cfg.MemoryUsageLimit, "mem-limit", 100, "memory usage limit in percents 0 <= mem-limit >=")
 	flag.StringVar(&cfg.MemoryCheckType, "mem-type", "ram", "memory type for checking: ram, disk, both")
 	flag.Parse()
 	if serverAddr, ok := os.LookupEnv("SERVER_ADDRESS"); ok {
