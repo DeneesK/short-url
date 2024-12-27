@@ -14,7 +14,7 @@ func main() {
 	conf := conf.MustLoad()
 	storage := storage.NewMemoryStorage()
 	rep := repository.NewRepository(storage, conf.BaseURL)
-	router := router.NewRouter(rep, conf.RateLimit)
+	router := router.NewRouter(rep, conf.MemoryUsageLimit, conf.MemoryCheckType)
 	if err := http.ListenAndServe(conf.ServerAddr, router); err != nil {
 		log.Fatal(err)
 	}

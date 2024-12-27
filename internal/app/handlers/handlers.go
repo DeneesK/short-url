@@ -30,7 +30,7 @@ func URLSaver(urlSaver URLRepository) http.HandlerFunc {
 			return
 		}
 
-		shortURL, err := urlSaver.SaveURL(url) // Добавил проверку выше
+		shortURL, err := urlSaver.SaveURL(url)
 		if err != nil {
 			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())
 			http.Error(w, errorString, http.StatusBadRequest)

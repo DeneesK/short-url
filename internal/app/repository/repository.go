@@ -1,12 +1,18 @@
 package repository
 
 import (
+	"errors"
+	"fmt"
 	"net/url"
 
 	"github.com/DeneesK/short-url/internal/pkg/random"
+	"github.com/DeneesK/short-url/internal/storage"
 )
 
-const idLength = 8
+const (
+	maxRetries = 3
+	idLength   = 8
+)
 
 type Storage interface {
 	Save(id, value string) error
@@ -19,11 +25,20 @@ type Repository struct {
 }
 
 func (r *Repository) SaveURL(u string) (string, error) {
-	alias := random.RandomString(idLength)
+	var alias string
+	var err error
 
-	err := r.storage.Save(alias, u)
-	if err != nil {
-		return "", err
+	for i := 0; i < maxRetries; i++ {
+		alias = random.RandomString(idLength)
+
+		err = r.storage.Save(alias, u)
+		if err != nil {
+			if errors.Is(err, storage.ErrNotUniqueID) {
+				continue
+			}
+			return "", fmt.Errorf("failed to generate unique alias after %d attempts", maxRetries)
+		}
+		break
 	}
 
 	shortURL, err := url.JoinPath(r.baseAddr, alias)

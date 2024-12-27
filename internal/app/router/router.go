@@ -1,11 +1,9 @@
 package router
 
 import (
-	"time"
-
 	"github.com/DeneesK/short-url/internal/app/handlers"
+	"github.com/DeneesK/short-url/internal/app/middlewares"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/httprate"
 )
 
 type Repository interface {
@@ -13,12 +11,12 @@ type Repository interface {
 	GetURL(string) (string, error)
 }
 
-func NewRouter(rep Repository, rateLimit int) *chi.Mux {
+func NewRouter(rep Repository, memUsageLimit float64, memCheckingType string) *chi.Mux {
 	r := chi.NewRouter()
 
-	r.Use(httprate.LimitByIP(rateLimit, time.Minute))
+	m := middlewares.NewMemoryControlMiddleware(memUsageLimit, memCheckingType)
+	r.With(m).Post("/", handlers.URLSaver(rep))
 
-	r.Post("/", handlers.URLSaver(rep))
 	r.Get("/{id}", handlers.URLRedirect(rep))
 
 	return r
