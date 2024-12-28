@@ -16,6 +16,7 @@ func (s *MemoryStorage) Save(id, value string) error {
 	if s.isExists(id) {
 		return ErrNotUniqueID
 	}
+
 	s.m.Lock()
 	s.storage[id] = value
 	s.updateSize(id, value)
@@ -46,12 +47,10 @@ func (s *MemoryStorage) isExists(id string) bool {
 
 func (s *MemoryStorage) updateSize(newRow ...string) {
 	var size uint64
-	s.m.Lock()
 	for _, s := range newRow {
 		size += uint64(len(s)) + stringOverhead
 	}
 	s.currentBytesSize += size
-	s.m.Unlock()
 }
 
 func NewMemoryStorage() *MemoryStorage {
