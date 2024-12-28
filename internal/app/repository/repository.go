@@ -9,6 +9,8 @@ import (
 	"github.com/DeneesK/short-url/internal/storage"
 )
 
+var ErrStorageLimitExceeded = errors.New("storage limit exceeded")
+
 const (
 	maxRetries = 3
 	idLength   = 8
@@ -17,14 +19,20 @@ const (
 type Storage interface {
 	Save(id, value string) error
 	Get(id string) (string, error)
+	CurrentSize() uint64
 }
 
 type Repository struct {
-	storage  Storage
-	baseAddr string
+	storage        Storage
+	baseAddr       string
+	maxStorageSize uint64
 }
 
 func (r *Repository) SaveURL(u string) (string, error) {
+	if r.storage.CurrentSize() > r.maxStorageSize {
+		return "", ErrStorageLimitExceeded
+	}
+
 	var alias string
 	var err error
 
@@ -35,10 +43,14 @@ func (r *Repository) SaveURL(u string) (string, error) {
 		if err != nil {
 			if errors.Is(err, storage.ErrNotUniqueID) {
 				continue
+			} else {
+				return "", err
 			}
-			return "", fmt.Errorf("failed to generate unique alias after %d attempts", maxRetries)
 		}
 		break
+	}
+	if err != nil {
+		return "", fmt.Errorf("failed to generate unique alias after %d attempts", maxRetries)
 	}
 
 	shortURL, err := url.JoinPath(r.baseAddr, alias)
@@ -56,9 +68,10 @@ func (r *Repository) GetURL(id string) (string, error) {
 	return url, nil
 }
 
-func NewRepository(storage Storage, baseAddr string) *Repository {
+func NewRepository(storage Storage, baseAddr string, maxStorageSize uint64) *Repository {
 	return &Repository{
-		storage:  storage,
-		baseAddr: baseAddr,
+		storage:        storage,
+		baseAddr:       baseAddr,
+		maxStorageSize: maxStorageSize,
 	}
 }
