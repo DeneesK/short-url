@@ -10,17 +10,21 @@ type MemoryStorage struct {
 	m                sync.RWMutex
 	storage          map[string]string
 	currentBytesSize uint64
+	maxStorageSize   uint64
 }
 
 func (s *MemoryStorage) Save(id, value string) error {
+	s.m.Lock()
+	defer s.m.Unlock()
+
 	if s.isExists(id) {
 		return ErrNotUniqueID
+	} else if s.currentBytesSize > s.maxStorageSize {
+		return ErrStorageLimitExceeded
 	}
 
-	s.m.Lock()
 	s.storage[id] = value
 	s.updateSize(id, value)
-	s.m.Unlock()
 	return nil
 }
 
@@ -34,14 +38,8 @@ func (s *MemoryStorage) Get(id string) (string, error) {
 	return v, nil
 }
 
-func (s *MemoryStorage) CurrentSize() uint64 {
-	return s.currentBytesSize
-}
-
 func (s *MemoryStorage) isExists(id string) bool {
-	s.m.RLock()
 	_, e := s.storage[id]
-	s.m.RUnlock()
 	return e
 }
 
@@ -53,9 +51,10 @@ func (s *MemoryStorage) updateSize(newRow ...string) {
 	s.currentBytesSize += size
 }
 
-func NewMemoryStorage() *MemoryStorage {
+func NewMemoryStorage(maxStorageSize uint64) *MemoryStorage {
 	return &MemoryStorage{
-		m:       sync.RWMutex{},
-		storage: make(map[string]string),
+		m:              sync.RWMutex{},
+		storage:        make(map[string]string),
+		maxStorageSize: maxStorageSize,
 	}
 }
