@@ -1,20 +1,19 @@
 package router
 
 import (
-	"github.com/DeneesK/short-url/internal/app/handlers"
 	"github.com/go-chi/chi/v5"
 )
 
-type Repository interface {
-	SaveURL(string) (string, error)
-	GetURL(string) (string, error)
+type URLService interface {
+	ShortenURL(string) (string, error)
+	FindByShortened(string) (string, error)
 }
 
-func NewRouter(rep Repository) *chi.Mux {
+func NewRouter(service URLService) *chi.Mux {
 	r := chi.NewRouter()
 
-	r.Post("/", handlers.URLSaver(rep))
-	r.Get("/{id}", handlers.URLRedirect(rep))
+	r.Post("/", ShortenURL(service))
+	r.Get("/{id}", URLRedirect(service))
 
 	return r
 }

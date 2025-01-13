@@ -1,20 +1,15 @@
-package handlers
+package router
 
 import (
 	"fmt"
 	"io"
 	"net/http"
 
-	"github.com/DeneesK/short-url/internal/pkg/validator"
+	"github.com/DeneesK/short-url/pkg/validator"
 	"github.com/go-chi/chi/v5"
 )
 
-type URLRepository interface {
-	SaveURL(string) (string, error)
-	GetURL(string) (string, error)
-}
-
-func URLSaver(urlSaver URLRepository) http.HandlerFunc {
+func ShortenURL(urlService URLService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -30,7 +25,7 @@ func URLSaver(urlSaver URLRepository) http.HandlerFunc {
 			return
 		}
 
-		shortURL, err := urlSaver.SaveURL(url)
+		shortURL, err := urlService.ShortenURL(url)
 		if err != nil {
 			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())
 			http.Error(w, errorString, http.StatusBadRequest)
@@ -43,7 +38,7 @@ func URLSaver(urlSaver URLRepository) http.HandlerFunc {
 	}
 }
 
-func URLRedirect(urlStorage URLRepository) http.HandlerFunc {
+func URLRedirect(urlStorage URLService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 
@@ -52,7 +47,7 @@ func URLRedirect(urlStorage URLRepository) http.HandlerFunc {
 			return
 		}
 
-		url, err := urlStorage.GetURL(id)
+		url, err := urlStorage.FindByShortened(id)
 		if err != nil {
 			errorString := fmt.Sprintf("failed to redirect: %s", err.Error())
 			http.Error(w, errorString, http.StatusBadRequest)

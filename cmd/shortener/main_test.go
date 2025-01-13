@@ -16,19 +16,19 @@ import (
 
 const testID = "test-id"
 
-type repositoryMock struct {
+type ShortenerURLServiceMock struct {
 	m       sync.RWMutex
 	storage map[string]string
 }
 
-func (r *repositoryMock) SaveURL(value string) (string, error) {
+func (r *ShortenerURLServiceMock) ShortenURL(value string) (string, error) {
 	r.m.Lock()
 	defer r.m.Unlock()
 	r.storage[testID] = value
 	return testID, nil
 }
 
-func (r *repositoryMock) GetURL(id string) (string, error) {
+func (r *ShortenerURLServiceMock) FindByShortened(id string) (string, error) {
 	r.m.RLock()
 	defer r.m.RUnlock()
 	v, ok := r.storage[id]
@@ -54,7 +54,7 @@ func testRequest(t *testing.T, ts *httptest.Server, method,
 }
 
 func TestRouter(t *testing.T) {
-	rep := &repositoryMock{storage: make(map[string]string)}
+	rep := &ShortenerURLServiceMock{storage: make(map[string]string)}
 	r := router.NewRouter(rep)
 	ts := httptest.NewServer(r)
 	defer ts.Close()
