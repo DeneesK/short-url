@@ -7,13 +7,13 @@ import (
 	"github.com/DeneesK/short-url/internal/app/logger"
 	"github.com/DeneesK/short-url/internal/app/router"
 	"github.com/DeneesK/short-url/internal/app/service"
-	memstorage "github.com/DeneesK/short-url/internal/app/storage/memory_storage"
+	"github.com/DeneesK/short-url/internal/app/storage/memorystorage"
 )
 
 func main() {
 	conf := conf.MustLoad()
 	log := logger.MustInitializedLogger()
-	storage := memstorage.NewMemoryStorage(conf.MemoryUsageLimitBytes)
+	storage := memorystorage.NewMemoryStorage(conf.MemoryUsageLimitBytes)
 	service := service.NewURLShortener(storage, conf.BaseURL)
 	router := router.NewRouter(service, log)
 
