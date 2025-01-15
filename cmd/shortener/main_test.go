@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -12,23 +13,24 @@ import (
 	"github.com/DeneesK/short-url/internal/app/router"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 const testID = "test-id"
 
-type repositoryMock struct {
+type ShortenerURLServiceMock struct {
 	m       sync.RWMutex
 	storage map[string]string
 }
 
-func (r *repositoryMock) SaveURL(value string) (string, error) {
+func (r *ShortenerURLServiceMock) ShortenURL(value string) (string, error) {
 	r.m.Lock()
 	defer r.m.Unlock()
 	r.storage[testID] = value
 	return testID, nil
 }
 
-func (r *repositoryMock) GetURL(id string) (string, error) {
+func (r *ShortenerURLServiceMock) FindByShortened(id string) (string, error) {
 	r.m.RLock()
 	defer r.m.RUnlock()
 	v, ok := r.storage[id]
@@ -54,8 +56,15 @@ func testRequest(t *testing.T, ts *httptest.Server, method,
 }
 
 func TestRouter(t *testing.T) {
-	rep := &repositoryMock{storage: make(map[string]string)}
-	r := router.NewRouter(rep)
+	rep := &ShortenerURLServiceMock{storage: make(map[string]string)}
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	sugar := *logger.Sugar()
+
+	r := router.NewRouter(rep, &sugar)
 	ts := httptest.NewServer(r)
 	defer ts.Close()
 
