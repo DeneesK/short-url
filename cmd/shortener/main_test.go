@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -12,6 +13,7 @@ import (
 	"github.com/DeneesK/short-url/internal/app/router"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 const testID = "test-id"
@@ -55,7 +57,14 @@ func testRequest(t *testing.T, ts *httptest.Server, method,
 
 func TestRouter(t *testing.T) {
 	rep := &ShortenerURLServiceMock{storage: make(map[string]string)}
-	r := router.NewRouter(rep)
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	sugar := *logger.Sugar()
+
+	r := router.NewRouter(rep, &sugar)
 	ts := httptest.NewServer(r)
 	defer ts.Close()
 
