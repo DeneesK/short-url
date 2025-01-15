@@ -12,12 +12,12 @@ import (
 
 func main() {
 	conf := conf.MustLoad()
-	log := logger.MustInitializedLogger()
+	log := logger.MustInitializedLogger(conf.Env)
 	storage := memorystorage.NewMemoryStorage(conf.MemoryUsageLimitBytes)
 	service := service.NewURLShortener(storage, conf.BaseURL)
 	router := router.NewRouter(service, log)
 
-	log.Infof("starting server, listening %s", conf.ServerAddr)
+	log.Infow("starting server, listening %s", conf.ServerAddr)
 
 	if err := http.ListenAndServe(conf.ServerAddr, router); err != nil {
 		log.Fatalw(err.Error(), "event", "start server")
