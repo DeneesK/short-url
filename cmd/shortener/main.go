@@ -17,7 +17,7 @@ func main() {
 	service := service.NewURLShortener(storage, conf.BaseURL)
 	router := router.NewRouter(service, log)
 
-	log.Infow("starting server, listening %s", conf.ServerAddr)
+	log.Infof("starting server, listening %s", conf.ServerAddr)
 
 	if err := http.ListenAndServe(conf.ServerAddr, router); err != nil {
 		log.Fatalw(err.Error(), "event", "start server")

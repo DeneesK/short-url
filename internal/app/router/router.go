@@ -16,8 +16,9 @@ func NewRouter(service URLService, log *zap.SugaredLogger) *chi.Mux {
 	loggingMiddleware := NewLoggingMiddleware(log)
 	r.Use(loggingMiddleware)
 
-	r.Post("/", URLShortener(service))
-	r.Get("/{id}", URLRedirect(service))
+	r.Post("/", URLShortener(service, log))
+	r.Get("/{id}", URLRedirect(service, log))
+	r.Post("/api/shorten", URLShortenerJSON(service, log))
 
 	return r
 }

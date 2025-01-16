@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -40,8 +41,7 @@ func (r *ShortenerURLServiceMock) FindByShortened(id string) (string, error) {
 	return v, nil
 }
 
-func testRequest(t *testing.T, ts *httptest.Server, method,
-	path string, body []byte) (*http.Response, string) {
+func testRequest(t *testing.T, ts *httptest.Server, method, path string, body []byte) (*http.Response, string) {
 	req, err := http.NewRequest(method, ts.URL+path, bytes.NewReader(body))
 	require.NoError(t, err)
 
@@ -67,6 +67,10 @@ func TestRouter(t *testing.T) {
 	r := router.NewRouter(rep, &sugar)
 	ts := httptest.NewServer(r)
 	defer ts.Close()
+
+	longURLJSON := router.LongURL{Url: "http://example.com"}
+	jsonLongURLBody, err := json.Marshal(longURLJSON)
+	require.NoError(t, err)
 
 	type want struct {
 		code int
@@ -108,6 +112,23 @@ func TestRouter(t *testing.T) {
 			name:   "get '/{id}' with wrong id",
 			url:    "/wrong-id",
 			method: http.MethodGet,
+			want: want{
+				code: http.StatusBadRequest,
+			},
+		},
+		{
+			name:   "post '/api/shorten'",
+			url:    "/api/shorten",
+			method: http.MethodPost,
+			body:   jsonLongURLBody,
+			want: want{
+				code: http.StatusCreated,
+			},
+		},
+		{
+			name:   "post '/api/shorten' empty body",
+			url:    "/api/shorten",
+			method: http.MethodPost,
 			want: want{
 				code: http.StatusBadRequest,
 			},

@@ -21,8 +21,8 @@ func MustLoad() *ServerConf {
 	var cfg ServerConf
 	flag.StringVar(&cfg.ServerAddr, "a", "localhost:8080", "address and port to run server")
 	flag.StringVar(&cfg.BaseURL, "b", "http://localhost:8080", "base address of the resulting shortened URL")
-	flag.Float64Var(&limit, "mlimit", 1, "memory usage limit in Gb")
-	flag.StringVar(&cfg.Env, "env", "dev", "env: dev or prod")
+	flag.Float64Var(&limit, "memlimit", 1, "memory usage limit in Gb")
+	flag.StringVar(&cfg.Env, "env", "dev", "environment: dev or prod")
 	flag.Parse()
 	cfg.MemoryUsageLimitBytes = uint64(limit * gbyte)
 	if serverAddr, ok := os.LookupEnv("SERVER_ADDRESS"); ok {
