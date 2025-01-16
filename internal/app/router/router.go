@@ -1,20 +1,24 @@
 package router
 
 import (
-	"github.com/DeneesK/short-url/internal/app/handlers"
 	"github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 )
 
-type Repository interface {
-	SaveURL(string) (string, error)
-	GetURL(string) (string, error)
+type URLService interface {
+	ShortenURL(string) (string, error)
+	FindByShortened(string) (string, error)
 }
 
-func NewRouter(rep Repository) *chi.Mux {
+func NewRouter(service URLService, log *zap.SugaredLogger) *chi.Mux {
 	r := chi.NewRouter()
 
-	r.Post("/", handlers.URLSaver(rep))
-	r.Get("/{id}", handlers.URLRedirect(rep))
+	loggingMiddleware := NewLoggingMiddleware(log)
+	r.Use(loggingMiddleware)
+
+	r.Post("/", URLShortener(service, log))
+	r.Get("/{id}", URLRedirect(service, log))
+	r.Post("/api/shorten", URLShortenerJSON(service, log))
 
 	return r
 }

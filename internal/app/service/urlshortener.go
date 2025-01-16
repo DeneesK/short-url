@@ -1,12 +1,12 @@
-package repository
+package service
 
 import (
 	"errors"
 	"fmt"
 	"net/url"
 
-	"github.com/DeneesK/short-url/internal/pkg/random"
-	"github.com/DeneesK/short-url/internal/storage"
+	"github.com/DeneesK/short-url/internal/app/storage"
+	"github.com/DeneesK/short-url/pkg/random"
 )
 
 const (
@@ -15,23 +15,23 @@ const (
 )
 
 type Storage interface {
-	Save(id, value string) error
+	Store(id, value string) error
 	Get(id string) (string, error)
 }
 
-type Repository struct {
+type URLShortener struct {
 	storage  Storage
 	baseAddr string
 }
 
-func (r *Repository) SaveURL(u string) (string, error) {
+func (s *URLShortener) ShortenURL(longURL string) (string, error) {
 	var alias string
 	var err error
 
 	for i := 0; i < maxRetries; i++ {
 		alias = random.RandomString(idLength)
 
-		err = r.storage.Save(alias, u)
+		err = s.storage.Store(alias, longURL)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotUniqueID) {
 				continue
@@ -45,23 +45,23 @@ func (r *Repository) SaveURL(u string) (string, error) {
 		return "", fmt.Errorf("failed to generate unique alias after %d attempts", maxRetries)
 	}
 
-	shortURL, err := url.JoinPath(r.baseAddr, alias)
+	shortURL, err := url.JoinPath(s.baseAddr, alias)
 	if err != nil {
 		return "", err
 	}
 	return shortURL, nil
 }
 
-func (r *Repository) GetURL(id string) (string, error) {
-	url, err := r.storage.Get(id)
+func (s *URLShortener) FindByShortened(id string) (string, error) {
+	shortURL, err := s.storage.Get(id)
 	if err != nil {
 		return "", err
 	}
-	return url, nil
+	return shortURL, nil
 }
 
-func NewRepository(storage Storage, baseAddr string) *Repository {
-	return &Repository{
+func NewURLShortener(storage Storage, baseAddr string) *URLShortener {
+	return &URLShortener{
 		storage:  storage,
 		baseAddr: baseAddr,
 	}
