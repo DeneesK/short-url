@@ -68,7 +68,7 @@ func TestRouter(t *testing.T) {
 	ts := httptest.NewServer(r)
 	defer ts.Close()
 
-	longURLJSON := router.LongURL{Url: "http://example.com"}
+	longURLJSON := router.LongURL{URL: "http://example.com"}
 	jsonLongURLBody, err := json.Marshal(longURLJSON)
 	require.NoError(t, err)
 

@@ -12,7 +12,7 @@ import (
 )
 
 type LongURL struct {
-	Url string `json:"url"`
+	URL string `json:"url"`
 }
 
 type ShortURL struct {
@@ -55,21 +55,20 @@ func URLShortenerJSON(urlService URLService, log *zap.SugaredLogger) http.Handle
 	return func(w http.ResponseWriter, r *http.Request) {
 		var longURL LongURL
 
-		dec := json.NewDecoder(r.Body)
-		err := dec.Decode(&longURL)
+		err := json.NewDecoder(r.Body).Decode(&longURL)
 		if err != nil {
 			log.Errorf("failed to decode request's body %s", err)
 			http.Error(w, "failed to decode request's body", http.StatusBadRequest)
 			return
 		}
 
-		if isValid := validator.IsValidURL(longURL.Url); !isValid {
-			log.Errorf("body must have valid url, url %s", longURL.Url)
+		if isValid := validator.IsValidURL(longURL.URL); !isValid {
+			log.Errorf("body must have valid url, url %s", longURL.URL)
 			http.Error(w, "body must have valid url", http.StatusBadRequest)
 			return
 		}
 
-		shortURL, err := urlService.ShortenURL(longURL.Url)
+		shortURL, err := urlService.ShortenURL(longURL.URL)
 		if err != nil {
 			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())
 			log.Error(errorString)
@@ -82,8 +81,7 @@ func URLShortenerJSON(urlService URLService, log *zap.SugaredLogger) http.Handle
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 
-		enc := json.NewEncoder(w)
-		err = enc.Encode(res)
+		err = json.NewEncoder(w).Encode(res)
 		if err != nil {
 			errorString := fmt.Sprintf("failed to encode short url: %s", err.Error())
 			log.Error(errorString)
