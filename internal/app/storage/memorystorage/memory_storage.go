@@ -1,7 +1,9 @@
-package storage
+package memorystorage
 
 import (
 	"sync"
+
+	"github.com/DeneesK/short-url/internal/app/storage"
 )
 
 const stringOverhead = 16
@@ -13,14 +15,14 @@ type MemoryStorage struct {
 	maxStorageSize   uint64
 }
 
-func (s *MemoryStorage) Save(id, value string) error {
+func (s *MemoryStorage) Store(id, value string) error {
 	s.m.Lock()
 	defer s.m.Unlock()
 
 	if s.isExists(id) {
-		return ErrNotUniqueID
+		return storage.ErrNotUniqueID
 	} else if s.currentBytesSize > s.maxStorageSize {
-		return ErrStorageLimitExceeded
+		return storage.ErrStorageLimitExceeded
 	}
 
 	s.storage[id] = value

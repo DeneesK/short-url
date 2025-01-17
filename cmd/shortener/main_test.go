@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -12,23 +14,24 @@ import (
 	"github.com/DeneesK/short-url/internal/app/router"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 const testID = "test-id"
 
-type repositoryMock struct {
+type ShortenerURLServiceMock struct {
 	m       sync.RWMutex
 	storage map[string]string
 }
 
-func (r *repositoryMock) SaveURL(value string) (string, error) {
+func (r *ShortenerURLServiceMock) ShortenURL(value string) (string, error) {
 	r.m.Lock()
 	defer r.m.Unlock()
 	r.storage[testID] = value
 	return testID, nil
 }
 
-func (r *repositoryMock) GetURL(id string) (string, error) {
+func (r *ShortenerURLServiceMock) FindByShortened(id string) (string, error) {
 	r.m.RLock()
 	defer r.m.RUnlock()
 	v, ok := r.storage[id]
@@ -38,8 +41,7 @@ func (r *repositoryMock) GetURL(id string) (string, error) {
 	return v, nil
 }
 
-func testRequest(t *testing.T, ts *httptest.Server, method,
-	path string, body []byte) (*http.Response, string) {
+func testRequest(t *testing.T, ts *httptest.Server, method, path string, body []byte) (*http.Response, string) {
 	req, err := http.NewRequest(method, ts.URL+path, bytes.NewReader(body))
 	require.NoError(t, err)
 
@@ -54,10 +56,21 @@ func testRequest(t *testing.T, ts *httptest.Server, method,
 }
 
 func TestRouter(t *testing.T) {
-	rep := &repositoryMock{storage: make(map[string]string)}
-	r := router.NewRouter(rep)
+	rep := &ShortenerURLServiceMock{storage: make(map[string]string)}
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	sugar := *logger.Sugar()
+
+	r := router.NewRouter(rep, &sugar)
 	ts := httptest.NewServer(r)
 	defer ts.Close()
+
+	longURLJSON := router.LongURL{URL: "http://example.com"}
+	jsonLongURLBody, err := json.Marshal(longURLJSON)
+	require.NoError(t, err)
 
 	type want struct {
 		code int
@@ -99,6 +112,23 @@ func TestRouter(t *testing.T) {
 			name:   "get '/{id}' with wrong id",
 			url:    "/wrong-id",
 			method: http.MethodGet,
+			want: want{
+				code: http.StatusBadRequest,
+			},
+		},
+		{
+			name:   "post '/api/shorten'",
+			url:    "/api/shorten",
+			method: http.MethodPost,
+			body:   jsonLongURLBody,
+			want: want{
+				code: http.StatusCreated,
+			},
+		},
+		{
+			name:   "post '/api/shorten' empty body",
+			url:    "/api/shorten",
+			method: http.MethodPost,
 			want: want{
 				code: http.StatusBadRequest,
 			},
