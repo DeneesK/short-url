@@ -13,6 +13,8 @@ import (
 func main() {
 	conf := conf.MustLoad()
 	log := logger.MustInitializedLogger(conf.Env)
+	defer log.Sync()
+
 	storage := memorystorage.NewMemoryStorage(conf.MemoryUsageLimitBytes)
 	service := service.NewURLShortener(storage, conf.BaseURL)
 	router := router.NewRouter(service, log)
