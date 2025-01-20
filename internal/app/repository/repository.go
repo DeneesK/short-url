@@ -33,8 +33,8 @@ func NewRepository(storage Storage, dumpingFilePath string) (*Repository, error)
 	if err != nil {
 		return nil, err
 	}
-	rep.encoder = json.NewEncoder(file)
 	err = rep.restoreFromDump(file)
+	rep.encoder = json.NewEncoder(file)
 	if err != nil {
 		return nil, err
 	}
