@@ -1,8 +1,8 @@
 package repository
 
 import (
-	"bufio"
 	"encoding/json"
+	"log"
 	"os"
 )
 
@@ -19,35 +19,29 @@ type Storage interface {
 }
 
 type Repository struct {
-	dumpingFilePath string
-	storage         Storage
-	encoder         *json.Encoder
+	storage Storage
+	file    *os.File
+	encoder *json.Encoder
 }
 
-func NewRepository(storage Storage, dumpingFilePath string) (*Repository, error) {
-	rep := &Repository{
-		dumpingFilePath: dumpingFilePath,
-		storage:         storage,
-	}
-	file, err := os.OpenFile(dumpingFilePath, os.O_CREATE|os.O_RDWR|os.O_APPEND, filePerm)
+func NewRepository(storage Storage, dumpFilePath string) *Repository {
+	file, err := os.OpenFile(dumpFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, filePerm)
 	if err != nil {
-		return nil, err
+		log.Fatalf("failed to initialized repository: %s", err)
 	}
-	err = rep.restoreFromDump(file)
-	rep.encoder = json.NewEncoder(file)
-	if err != nil {
-		return nil, err
+
+	return &Repository{
+		storage: storage,
+		file:    file,
+		encoder: json.NewEncoder(file),
 	}
-	return rep, nil
 }
 
 func (rep *Repository) Store(id, value string) error {
-	err := rep.storage.Store(id, value)
-	if err != nil {
+	if err := rep.storage.Store(id, value); err != nil {
 		return err
 	}
-	err = rep.dumpToFile(id, value)
-	if err != nil {
+	if err := rep.storeToFile(id, value); err != nil {
 		return err
 	}
 	return nil
@@ -57,25 +51,11 @@ func (rep *Repository) Get(id string) (string, error) {
 	return rep.storage.Get(id)
 }
 
-func (rep *Repository) dumpToFile(id, value string) error {
-	return rep.encoder.Encode(row{ShortURL: id, LongURL: value})
+func (rep *Repository) Close() error {
+	return rep.file.Close()
 }
 
-func (rep *Repository) restoreFromDump(file *os.File) error {
-	scanner := bufio.NewScanner(file)
-	var r row
-
-	for scanner.Scan() {
-		data := scanner.Bytes()
-		err := json.Unmarshal(data, &r)
-		if err != nil {
-			return err
-		}
-
-		err = rep.storage.Store(r.ShortURL, r.LongURL)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+func (rep *Repository) storeToFile(id, value string) error {
+	r := row{ShortURL: id, LongURL: value}
+	return rep.encoder.Encode(r)
 }

@@ -13,10 +13,7 @@ type MemoryStorage struct {
 	storage          map[string]string
 	currentBytesSize uint64
 	maxStorageSize   uint64
-	fileStorage      string
 }
-
-// TODO Implement storinr to file(json)
 
 func (s *MemoryStorage) Store(id, value string) error {
 	s.m.Lock()

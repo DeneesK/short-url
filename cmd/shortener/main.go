@@ -13,18 +13,15 @@ import (
 func main() {
 	conf := conf.MustLoad()
 
-	log := logger.MustInitializedLogger(conf.Env)
+	log := logger.NewLogger(conf.Env)
 	defer log.Sync()
 
 	storage := memorystorage.NewMemoryStorage(conf.MemoryUsageLimitBytes)
-	rep, err := repository.NewRepository(storage, conf.FileStoragePath)
-	if err != nil {
-		log.Fatalf("failed to initialized repository: %s", err)
-	}
+	rep := repository.NewRepository(storage, conf.FileStoragePath)
 
 	service := service.NewURLShortener(rep, conf.BaseURL)
 	router := router.NewRouter(service, log)
 
-	app := app.NewApp(conf.ServerAddr, router, log)
+	app := app.NewApp(conf.ServerAddr, router)
 	app.Run()
 }

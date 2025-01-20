@@ -9,7 +9,7 @@ const (
 	prod = "prod"
 )
 
-func MustInitializedLogger(env string) *zap.SugaredLogger {
+func NewLogger(env string) *zap.SugaredLogger {
 	var logger *zap.Logger
 	var err error
 
