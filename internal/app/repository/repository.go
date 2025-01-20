@@ -29,21 +29,13 @@ func NewRepository(storage Storage, dumpingFilePath string) (*Repository, error)
 		dumpingFilePath: dumpingFilePath,
 		storage:         storage,
 	}
-	file, err := os.OpenFile(dumpingFilePath, os.O_RDWR|os.O_APPEND, filePerm)
-	switch {
-	case err == nil:
-		rep.encoder = json.NewEncoder(file)
-		err = rep.restoreFromDump(dumpingFilePath)
-		if err != nil {
-			return nil, err
-		}
-	case os.IsNotExist(err):
-		file, err := os.OpenFile(dumpingFilePath, os.O_CREATE|os.O_RDWR|os.O_APPEND, filePerm)
-		rep.encoder = json.NewEncoder(file)
-		if err != nil {
-			return nil, err
-		}
-	default:
+	file, err := os.OpenFile(dumpingFilePath, os.O_CREATE|os.O_RDWR|os.O_APPEND, filePerm)
+	if err != nil {
+		return nil, err
+	}
+	rep.encoder = json.NewEncoder(file)
+	err = rep.restoreFromDump(dumpingFilePath)
+	if err != nil {
 		return nil, err
 	}
 	return rep, nil
