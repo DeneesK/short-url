@@ -3,7 +3,6 @@ package repository
 import (
 	"bufio"
 	"encoding/json"
-	"log"
 	"os"
 )
 
@@ -57,7 +56,7 @@ func (rep *Repository) Store(id, value string) error {
 	}
 	err = rep.dumpToFile(id, value)
 	if err != nil {
-		log.Printf("repository.store: failed to dump data %s", err)
+		return err
 	}
 	return nil
 }
