@@ -34,7 +34,7 @@ func NewRepository(storage Storage, dumpingFilePath string) (*Repository, error)
 		return nil, err
 	}
 	rep.encoder = json.NewEncoder(file)
-	err = rep.restoreFromDump(dumpingFilePath)
+	err = rep.restoreFromDump(file)
 	if err != nil {
 		return nil, err
 	}
@@ -61,17 +61,13 @@ func (rep *Repository) dumpToFile(id, value string) error {
 	return rep.encoder.Encode(row{ShortURL: id, LongURL: value})
 }
 
-func (rep *Repository) restoreFromDump(dumpingFilePath string) error {
-	file, err := os.OpenFile(dumpingFilePath, os.O_RDONLY|os.O_CREATE, filePerm)
-	if err != nil {
-		return err
-	}
+func (rep *Repository) restoreFromDump(file *os.File) error {
 	scanner := bufio.NewScanner(file)
 	var r row
+
 	for scanner.Scan() {
 		data := scanner.Bytes()
-
-		err = json.Unmarshal(data, &r)
+		err := json.Unmarshal(data, &r)
 		if err != nil {
 			return err
 		}
