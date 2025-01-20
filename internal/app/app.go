@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-const shutdownTimeout = 1
+const shutdownTimeout = time.Second * 1
 
 type APP struct {
 	srv *http.Server
@@ -44,7 +44,7 @@ func (a *APP) Run() {
 	<-ctx.Done()
 
 	log.Print("application shutdown process...")
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second*shutdownTimeout)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	if err := a.srv.Shutdown(shutdownCtx); err != nil {
 		log.Fatalf("Error during shutdown: %s", err)
