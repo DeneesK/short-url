@@ -29,7 +29,7 @@ func NewRepository(storage Storage, dumpingFilePath string) (*Repository, error)
 		dumpingFilePath: dumpingFilePath,
 		storage:         storage,
 	}
-	file, err := os.OpenFile(dumpingFilePath, os.O_CREATE|os.O_RDWR|os.O_APPEND, filePerm)
+	file, err := os.OpenFile(dumpingFilePath, os.O_RDWR|os.O_APPEND, filePerm)
 	switch {
 	case err == nil:
 		rep.encoder = json.NewEncoder(file)
