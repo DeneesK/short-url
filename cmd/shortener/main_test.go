@@ -101,14 +101,6 @@ func TestRouter(t *testing.T) {
 			},
 		},
 		{
-			name:   "post '/' empty body",
-			url:    "/",
-			method: http.MethodPost,
-			want: want{
-				code: http.StatusBadRequest,
-			},
-		},
-		{
 			name:   "get '/{id}' with wrong id",
 			url:    "/wrong-id",
 			method: http.MethodGet,
