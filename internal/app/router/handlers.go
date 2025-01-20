@@ -6,9 +6,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/DeneesK/short-url/pkg/validator"
 	"github.com/go-chi/chi/v5"
-	"go.uber.org/zap"
 )
 
 type LongURL struct {
@@ -19,7 +17,7 @@ type ShortURL struct {
 	Result string `json:"result"`
 }
 
-func URLShortener(urlService URLService, log *zap.SugaredLogger) http.HandlerFunc {
+func URLShortener(urlService URLService, log Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -29,15 +27,9 @@ func URLShortener(urlService URLService, log *zap.SugaredLogger) http.HandlerFun
 		}
 		defer r.Body.Close()
 
-		url := string(body)
+		longURL := string(body)
 
-		if isValid := validator.IsValidURL(url); !isValid {
-			log.Errorf("body must have valid url, url %s", url)
-			http.Error(w, "body must have valid url", http.StatusBadRequest)
-			return
-		}
-
-		shortURL, err := urlService.ShortenURL(url)
+		shortURL, err := urlService.ShortenURL(longURL)
 		if err != nil {
 			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())
 			log.Error(errorString)
@@ -51,7 +43,7 @@ func URLShortener(urlService URLService, log *zap.SugaredLogger) http.HandlerFun
 	}
 }
 
-func URLShortenerJSON(urlService URLService, log *zap.SugaredLogger) http.HandlerFunc {
+func URLShortenerJSON(urlService URLService, log Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var longURL LongURL
 
@@ -59,12 +51,6 @@ func URLShortenerJSON(urlService URLService, log *zap.SugaredLogger) http.Handle
 		if err != nil {
 			log.Errorf("failed to decode request's body %s", err)
 			http.Error(w, "failed to decode request's body", http.StatusBadRequest)
-			return
-		}
-
-		if isValid := validator.IsValidURL(longURL.URL); !isValid {
-			log.Errorf("body must have valid url, url %s", longURL.URL)
-			http.Error(w, "body must have valid url", http.StatusBadRequest)
 			return
 		}
 
@@ -91,7 +77,7 @@ func URLShortenerJSON(urlService URLService, log *zap.SugaredLogger) http.Handle
 	}
 }
 
-func URLRedirect(urlService URLService, log *zap.SugaredLogger) http.HandlerFunc {
+func URLRedirect(urlService URLService, log Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 

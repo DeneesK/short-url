@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	"go.uber.org/zap"
 )
 
 const (
@@ -73,7 +71,7 @@ func (gr *gzipRequestReader) Close() error {
 	return gr.GzReader.Close()
 }
 
-func NewLoggingMiddleware(log *zap.SugaredLogger) func(http.Handler) http.Handler {
+func NewLoggingMiddleware(log Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -102,7 +100,7 @@ func NewLoggingMiddleware(log *zap.SugaredLogger) func(http.Handler) http.Handle
 	}
 }
 
-func NewGZIPMiddleware(log *zap.SugaredLogger) func(http.Handler) http.Handler {
+func NewGZIPMiddleware(log Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

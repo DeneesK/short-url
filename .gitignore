@@ -24,3 +24,7 @@ vendor/
 
 # DB files
 *.db
+file_storage*
+
+# MacOS
+.DS_Store

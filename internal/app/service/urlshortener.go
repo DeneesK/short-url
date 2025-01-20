@@ -7,6 +7,7 @@ import (
 
 	"github.com/DeneesK/short-url/internal/app/storage"
 	"github.com/DeneesK/short-url/pkg/random"
+	"github.com/DeneesK/short-url/pkg/validator"
 )
 
 const (
@@ -14,24 +15,27 @@ const (
 	idLength   = 8
 )
 
-type Storage interface {
+type Repository interface {
 	Store(id, value string) error
 	Get(id string) (string, error)
 }
 
 type URLShortener struct {
-	storage  Storage
+	rep      Repository
 	baseAddr string
 }
 
 func (s *URLShortener) ShortenURL(longURL string) (string, error) {
 	var alias string
 	var err error
+	if isValid := validator.IsValidURL(longURL); !isValid {
+		return "", fmt.Errorf("this url: '%s' is not valid url", longURL)
+	}
 
 	for i := 0; i < maxRetries; i++ {
 		alias = random.RandomString(idLength)
 
-		err = s.storage.Store(alias, longURL)
+		err = s.rep.Store(alias, longURL)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotUniqueID) {
 				continue
@@ -53,16 +57,16 @@ func (s *URLShortener) ShortenURL(longURL string) (string, error) {
 }
 
 func (s *URLShortener) FindByShortened(id string) (string, error) {
-	shortURL, err := s.storage.Get(id)
+	shortURL, err := s.rep.Get(id)
 	if err != nil {
-		return "", err
+		return "", nil
 	}
 	return shortURL, nil
 }
 
-func NewURLShortener(storage Storage, baseAddr string) *URLShortener {
+func NewURLShortener(storage Repository, baseAddr string) *URLShortener {
 	return &URLShortener{
-		storage:  storage,
+		rep:      storage,
 		baseAddr: baseAddr,
 	}
 }

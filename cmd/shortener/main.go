@@ -1,10 +1,10 @@
 package main
 
 import (
-	"net/http"
-
+	"github.com/DeneesK/short-url/internal/app"
 	"github.com/DeneesK/short-url/internal/app/conf"
 	"github.com/DeneesK/short-url/internal/app/logger"
+	"github.com/DeneesK/short-url/internal/app/repository"
 	"github.com/DeneesK/short-url/internal/app/router"
 	"github.com/DeneesK/short-url/internal/app/service"
 	"github.com/DeneesK/short-url/internal/app/storage/memorystorage"
@@ -12,16 +12,19 @@ import (
 
 func main() {
 	conf := conf.MustLoad()
+
 	log := logger.MustInitializedLogger(conf.Env)
 	defer log.Sync()
 
 	storage := memorystorage.NewMemoryStorage(conf.MemoryUsageLimitBytes)
-	service := service.NewURLShortener(storage, conf.BaseURL)
+	rep, err := repository.NewRepository(storage, conf.FileStoragePath)
+	if err != nil {
+		log.Fatalf("failed to initialized repository: %s", err)
+	}
+
+	service := service.NewURLShortener(rep, conf.BaseURL)
 	router := router.NewRouter(service, log)
 
-	log.Infof("starting server, listening %s", conf.ServerAddr)
-
-	if err := http.ListenAndServe(conf.ServerAddr, router); err != nil {
-		log.Fatalw(err.Error(), "event", "start server")
-	}
+	app := app.NewApp(conf.ServerAddr, router, log)
+	app.Run()
 }
