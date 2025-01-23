@@ -1,8 +1,8 @@
 package repository
 
 import (
+	"bufio"
 	"encoding/json"
-	"log"
 	"os"
 )
 
@@ -24,16 +24,51 @@ type Repository struct {
 	encoder *json.Encoder
 }
 
-func NewRepository(storage Storage, dumpFilePath string) *Repository {
-	file, err := os.OpenFile(dumpFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, filePerm)
-	if err != nil {
-		log.Fatalf("failed to initialized repository: %s", err)
-	}
+type Option func(*Repository) error
 
-	return &Repository{
+func NewRepository(storage Storage, opts ...Option) (*Repository, error) {
+	rep := &Repository{
 		storage: storage,
-		file:    file,
-		encoder: json.NewEncoder(file),
+	}
+	for _, opt := range opts {
+		if err := opt(rep); err != nil {
+			return nil, err
+		}
+	}
+	return rep, nil
+}
+
+func WithDumpFile(dumpFilePath string) Option {
+	return func(rep *Repository) error {
+		file, err := os.OpenFile(dumpFilePath, os.O_CREATE|os.O_RDWR|os.O_APPEND, filePerm)
+		if err != nil {
+			return err
+		}
+		rep.file = file
+		rep.encoder = json.NewEncoder(file)
+		return nil
+	}
+}
+
+func RestoreFromDump(dumpFilePath string) Option {
+	return func(rep *Repository) error {
+		scanner := bufio.NewScanner(rep.file)
+		for scanner.Scan() {
+			data := scanner.Bytes()
+
+			r := row{}
+			err := json.Unmarshal(data, &r)
+			if err != nil {
+				return err
+			}
+
+			err = rep.storage.Store(r.ShortURL, r.LongURL)
+			if err != nil {
+				return err
+			}
+
+		}
+		return nil
 	}
 }
 

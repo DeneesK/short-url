@@ -17,7 +17,15 @@ func main() {
 	defer log.Sync()
 
 	storage := memorystorage.NewMemoryStorage(conf.MemoryUsageLimitBytes)
-	rep := repository.NewRepository(storage, conf.FileStoragePath)
+	rep, err := repository.NewRepository(
+		storage,
+		repository.WithDumpFile(conf.FileStoragePath),
+		repository.RestoreFromDump(conf.FileStoragePath),
+	)
+	if err != nil {
+		log.Fatalf("failed to initialized repository: %s", err)
+	}
+	defer rep.Close()
 
 	service := service.NewURLShortener(rep, conf.BaseURL)
 	router := router.NewRouter(service, log)

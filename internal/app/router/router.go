@@ -1,6 +1,7 @@
 package router
 
 import (
+	"github.com/DeneesK/short-url/internal/app/router/middlewares"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -18,8 +19,8 @@ type Logger interface {
 func NewRouter(service URLService, log Logger) *chi.Mux {
 	r := chi.NewRouter()
 
-	loggingMiddleware := NewLoggingMiddleware(log)
-	gzipMiddleware := NewGZIPMiddleware(log)
+	loggingMiddleware := middlewares.NewLoggingMiddleware(log)
+	gzipMiddleware := middlewares.NewGZIPMiddleware(log)
 	r.Use(loggingMiddleware, gzipMiddleware)
 
 	r.Post("/", URLShortener(service, log))
