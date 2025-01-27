@@ -25,6 +25,13 @@ type URLShortener struct {
 	baseAddr string
 }
 
+func NewURLShortener(storage Repository, baseAddr string) *URLShortener {
+	return &URLShortener{
+		rep:      storage,
+		baseAddr: baseAddr,
+	}
+}
+
 func (s *URLShortener) ShortenURL(longURL string) (string, error) {
 	var alias string
 	var err error
@@ -62,11 +69,4 @@ func (s *URLShortener) FindByShortened(id string) (string, error) {
 		return "", nil
 	}
 	return shortURL, nil
-}
-
-func NewURLShortener(storage Repository, baseAddr string) *URLShortener {
-	return &URLShortener{
-		rep:      storage,
-		baseAddr: baseAddr,
-	}
 }

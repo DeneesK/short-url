@@ -30,29 +30,36 @@ func NewRepository(storage Storage, opts ...Option) (*Repository, error) {
 	rep := &Repository{
 		storage: storage,
 	}
+
 	for _, opt := range opts {
 		if err := opt(rep); err != nil {
 			return nil, err
 		}
 	}
+
 	return rep, nil
 }
 
-func WithDumpFile(dumpFilePath string) Option {
+func AddDumpFile(dumpFilePath string) Option {
 	return func(rep *Repository) error {
-		file, err := os.OpenFile(dumpFilePath, os.O_CREATE|os.O_RDWR|os.O_APPEND, filePerm)
+		file, err := os.OpenFile(dumpFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, filePerm)
 		if err != nil {
 			return err
 		}
 		rep.file = file
-		rep.encoder = json.NewEncoder(file)
+		rep.encoder = json.NewEncoder(rep.file)
 		return nil
 	}
 }
 
 func RestoreFromDump(dumpFilePath string) Option {
 	return func(rep *Repository) error {
-		scanner := bufio.NewScanner(rep.file)
+		file, err := os.OpenFile(dumpFilePath, os.O_RDONLY, filePerm)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
 			data := scanner.Bytes()
 
@@ -76,8 +83,10 @@ func (rep *Repository) Store(id, value string) error {
 	if err := rep.storage.Store(id, value); err != nil {
 		return err
 	}
-	if err := rep.storeToFile(id, value); err != nil {
-		return err
+	if rep.encoder != nil {
+		if err := rep.storeToFile(id, value); err != nil {
+			return err
+		}
 	}
 	return nil
 }

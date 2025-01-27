@@ -24,6 +24,6 @@ func NewLogger(env string) *zap.SugaredLogger {
 		logger.Fatal("failed to initialized new logger", zap.String("err", err.Error()))
 	}
 
-	sugar := *logger.Sugar()
-	return &sugar
+	sugar := logger.Sugar()
+	return sugar
 }

@@ -20,8 +20,9 @@ func NewRouter(service URLService, log Logger) *chi.Mux {
 	r := chi.NewRouter()
 
 	loggingMiddleware := middlewares.NewLoggingMiddleware(log)
-	gzipMiddleware := middlewares.NewGZIPMiddleware(log)
-	r.Use(loggingMiddleware, gzipMiddleware)
+	gzipReqDecodeMiddleware := middlewares.NewRequestDecodeMiddleware(log)
+	gzipRespEncodeMiddleware := middlewares.NewResponseEncodeMiddleware(log)
+	r.Use(loggingMiddleware, gzipReqDecodeMiddleware, gzipRespEncodeMiddleware)
 
 	r.Post("/", URLShortener(service, log))
 	r.Post("/api/shorten", URLShortenerJSON(service, log))
