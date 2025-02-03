@@ -1,68 +1,105 @@
 package repository
 
 import (
-	"errors"
-	"fmt"
-	"net/url"
-
-	"github.com/DeneesK/short-url/internal/pkg/random"
-	"github.com/DeneesK/short-url/internal/storage"
+	"bufio"
+	"encoding/json"
+	"os"
 )
 
-const (
-	maxRetries = 3
-	idLength   = 8
-)
+const filePerm = 0644
+
+type row struct {
+	ShortURL string `json:"short_url"`
+	LongURL  string `json:"long_url"`
+}
 
 type Storage interface {
-	Save(id, value string) error
+	Store(id, value string) error
 	Get(id string) (string, error)
 }
 
 type Repository struct {
-	storage  Storage
-	baseAddr string
+	storage Storage
+	file    *os.File
+	encoder *json.Encoder
 }
 
-func (r *Repository) SaveURL(u string) (string, error) {
-	var alias string
-	var err error
+type Option func(*Repository) error
 
-	for i := 0; i < maxRetries; i++ {
-		alias = random.RandomString(idLength)
+func NewRepository(storage Storage, opts ...Option) (*Repository, error) {
+	rep := &Repository{
+		storage: storage,
+	}
 
-		err = r.storage.Save(alias, u)
-		if err != nil {
-			if errors.Is(err, storage.ErrNotUniqueID) {
-				continue
-			} else {
-				return "", err
-			}
+	for _, opt := range opts {
+		if err := opt(rep); err != nil {
+			return nil, err
 		}
-		break
-	}
-	if err != nil {
-		return "", fmt.Errorf("failed to generate unique alias after %d attempts", maxRetries)
 	}
 
-	shortURL, err := url.JoinPath(r.baseAddr, alias)
-	if err != nil {
-		return "", err
-	}
-	return shortURL, nil
+	return rep, nil
 }
 
-func (r *Repository) GetURL(id string) (string, error) {
-	url, err := r.storage.Get(id)
-	if err != nil {
-		return "", err
+func AddDumpFile(dumpFilePath string) Option {
+	return func(rep *Repository) error {
+		file, err := os.OpenFile(dumpFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, filePerm)
+		if err != nil {
+			return err
+		}
+		rep.file = file
+		rep.encoder = json.NewEncoder(rep.file)
+		return nil
 	}
-	return url, nil
 }
 
-func NewRepository(storage Storage, baseAddr string) *Repository {
-	return &Repository{
-		storage:  storage,
-		baseAddr: baseAddr,
+func RestoreFromDump(dumpFilePath string) Option {
+	return func(rep *Repository) error {
+		file, err := os.OpenFile(dumpFilePath, os.O_RDONLY, filePerm)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			data := scanner.Bytes()
+
+			r := row{}
+			err := json.Unmarshal(data, &r)
+			if err != nil {
+				return err
+			}
+
+			err = rep.storage.Store(r.ShortURL, r.LongURL)
+			if err != nil {
+				return err
+			}
+
+		}
+		return nil
 	}
+}
+
+func (rep *Repository) Store(id, value string) error {
+	if err := rep.storage.Store(id, value); err != nil {
+		return err
+	}
+	if rep.encoder != nil {
+		if err := rep.storeToFile(id, value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (rep *Repository) Get(id string) (string, error) {
+	return rep.storage.Get(id)
+}
+
+func (rep *Repository) Close() error {
+	return rep.file.Close()
+}
+
+func (rep *Repository) storeToFile(id, value string) error {
+	r := row{ShortURL: id, LongURL: value}
+	return rep.encoder.Encode(r)
 }
