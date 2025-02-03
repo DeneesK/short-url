@@ -2,15 +2,16 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"log"
 
-	"github.com/jackc/pgx/v5"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-func NewConnection(ctx context.Context, dbURL string) *pgx.Conn {
-	conn, err := pgx.Connect(context.Background(), dbURL)
+func NewConnection(ctx context.Context, dbDSN string) *sql.DB {
+	db, err := sql.Open("pgx", dbDSN)
 	if err != nil {
-		log.Printf("Unable to connect to database: %v\n", err)
+		log.Fatalf("Unable to connect to database: %v\n", err)
 	}
-	return conn
+	return db
 }

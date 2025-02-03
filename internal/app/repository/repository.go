@@ -3,11 +3,11 @@ package repository
 import (
 	"bufio"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"os"
 
 	"github.com/DeneesK/short-url/internal/app/storage/postgres"
-	"github.com/jackc/pgx/v5"
 )
 
 const filePerm = 0644
@@ -26,7 +26,7 @@ type Repository struct {
 	storage Storage
 	file    *os.File
 	encoder *json.Encoder
-	conn    *pgx.Conn
+	db      *sql.DB
 }
 
 type Option func(*Repository) error
@@ -35,7 +35,7 @@ func NewRepository(storage Storage, opts ...Option) (*Repository, error) {
 	conn := postgres.NewConnection(context.TODO(), os.Getenv("DATABASE_DSN"))
 	rep := &Repository{
 		storage: storage,
-		conn:    conn,
+		db:      conn,
 	}
 
 	for _, opt := range opts {
@@ -103,11 +103,11 @@ func (rep *Repository) Get(id string) (string, error) {
 }
 
 func (rep *Repository) PingDB() error {
-	return rep.conn.Ping(context.TODO())
+	return rep.db.Ping()
 }
 
 func (rep *Repository) Close() error {
-	err := rep.conn.Close(context.TODO())
+	err := rep.db.Close()
 	if err != nil {
 		return err
 	}
