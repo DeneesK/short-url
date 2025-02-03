@@ -68,6 +68,10 @@ func (r *ShortenerURLServiceMock) FindByShortened(id string) (string, error) {
 	return v, nil
 }
 
+func (r *ShortenerURLServiceMock) PingDB() error {
+	return nil
+}
+
 func testRequest(t *testing.T, ts *httptest.Server, method, path string, body []byte) (*http.Response, string) {
 	req, err := http.NewRequest(method, ts.URL+path, bytes.NewReader(body))
 	require.NoError(t, err)

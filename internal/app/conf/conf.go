@@ -14,6 +14,7 @@ type ServerConf struct {
 	BaseURL               string
 	Env                   string
 	FileStoragePath       string
+	DBURL                 string
 	MemoryUsageLimitBytes uint64
 }
 
@@ -49,6 +50,9 @@ func MustLoad() *ServerConf {
 	}
 	if filiname, ok := os.LookupEnv("FILE_STORAGE_PATH"); ok {
 		cfg.FileStoragePath = filiname
+	}
+	if dbURL, ok := os.LookupEnv("DATABASE_DSN"); ok {
+		cfg.DBURL = dbURL
 	}
 	return &cfg
 }

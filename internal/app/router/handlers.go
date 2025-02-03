@@ -99,3 +99,15 @@ func URLRedirect(urlService URLService, log Logger) http.HandlerFunc {
 		http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 	}
 }
+
+func PingDB(urlService URLService, log Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		err := urlService.PingDB()
+		if err != nil {
+			log.Errorf("failed to ping db: %s", err)
+			http.Error(w, "database is not available", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}
+}

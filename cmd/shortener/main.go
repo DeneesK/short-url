@@ -15,7 +15,6 @@ func main() {
 
 	log := logger.NewLogger(conf.Env)
 	defer log.Sync()
-
 	storage := memorystorage.NewMemoryStorage(conf.MemoryUsageLimitBytes)
 	rep, err := repository.NewRepository(
 		storage,

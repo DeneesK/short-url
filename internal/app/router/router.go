@@ -8,6 +8,7 @@ import (
 type URLService interface {
 	ShortenURL(string) (string, error)
 	FindByShortened(string) (string, error)
+	PingDB() error
 }
 
 type Logger interface {
@@ -27,6 +28,7 @@ func NewRouter(service URLService, log Logger) *chi.Mux {
 	r.Post("/", URLShortener(service, log))
 	r.Post("/api/shorten", URLShortenerJSON(service, log))
 	r.Get("/{id}", URLRedirect(service, log))
+	r.Get("/ping", PingDB(service, log))
 
 	return r
 }
