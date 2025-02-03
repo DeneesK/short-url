@@ -204,7 +204,7 @@ func TestRepository_Initializing(t *testing.T) {
 
 	for _, v := range testTable {
 		t.Run(v.name, func(t *testing.T) {
-			_, err := repository.NewRepository(v.storage)
+			_, err := repository.NewRepository(v.storage, "")
 			assert.NoError(t, err)
 		})
 	}
@@ -213,7 +213,7 @@ func TestRepository_Initializing(t *testing.T) {
 func TestRepository_Get(t *testing.T) {
 	storage := &mockStorage{}
 	storage.On("Get", "short").Return("long", nil)
-	repo, _ := repository.NewRepository(storage)
+	repo, _ := repository.NewRepository(storage, "")
 
 	result, err := repo.Get("short")
 
@@ -225,7 +225,7 @@ func TestRepository_Get(t *testing.T) {
 func TestRepository_Store(t *testing.T) {
 	storage := &mockStorage{}
 	storage.On("Store", "short").Return("long", nil)
-	repo, err := repository.NewRepository(storage)
+	repo, err := repository.NewRepository(storage, "")
 	assert.NoError(t, err)
 	storage.On("Store", "short", "long").Return(nil)
 	err = repo.Store("short", "long")
@@ -239,7 +239,7 @@ func TestRepository_StoreToFile(t *testing.T) {
 	defer os.Remove(file.Name())
 
 	storage := &mockStorage{}
-	repo, err := repository.NewRepository(storage, repository.AddDumpFile(file.Name()))
+	repo, err := repository.NewRepository(storage, "", repository.AddDumpFile(file.Name()))
 	assert.NoError(t, err)
 	storage.On("Store", "short", "long").Return(nil)
 	err = repo.Store("short", "long")
@@ -274,7 +274,7 @@ func TestRepository_RestoreFromDump(t *testing.T) {
 	storage.On("Store", "short1", "long1").Return(nil)
 	storage.On("Store", "short2", "long2").Return(nil)
 
-	_, err = repository.NewRepository(storage, repository.RestoreFromDump(file.Name()))
+	_, err = repository.NewRepository(storage, "", repository.RestoreFromDump(file.Name()))
 	assert.NoError(t, err)
 
 	storage.AssertCalled(t, "Store", "short1", "long1")
@@ -288,7 +288,7 @@ func TestRepository_Close(t *testing.T) {
 	defer os.Remove(file.Name())
 
 	storage := &mockStorage{}
-	repo, err := repository.NewRepository(storage, repository.AddDumpFile(file.Name()))
+	repo, err := repository.NewRepository(storage, "", repository.AddDumpFile(file.Name()))
 	assert.NoError(t, err)
 
 	err = repo.Close()
@@ -298,7 +298,7 @@ func TestRepository_Close(t *testing.T) {
 func TestRepository_StoreWithError(t *testing.T) {
 	storage := &mockStorage{}
 	storage.On("Store", "short", "long").Return(errors.New("storage error"))
-	repo, _ := repository.NewRepository(storage)
+	repo, _ := repository.NewRepository(storage, "")
 
 	err := repo.Store("short", "long")
 
@@ -312,7 +312,7 @@ func TestURLShortenerService(t *testing.T) {
 	storage := &mockStorage{}
 	storage.On("Store", mock.Anything, mock.Anything).Return(nil)
 	storage.On("Get", testID).Return(longValidURL, nil)
-	repo, err := repository.NewRepository(storage)
+	repo, err := repository.NewRepository(storage, "")
 	assert.NoError(t, err)
 
 	ser := service.NewURLShortener(repo, baseAddr)

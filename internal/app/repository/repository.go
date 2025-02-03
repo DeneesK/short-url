@@ -31,8 +31,8 @@ type Repository struct {
 
 type Option func(*Repository) error
 
-func NewRepository(storage Storage, opts ...Option) (*Repository, error) {
-	conn := postgres.NewConnection(context.TODO(), os.Getenv("DATABASE_DSN"))
+func NewRepository(storage Storage, dbDSN string, opts ...Option) (*Repository, error) {
+	conn := postgres.NewConnection(context.TODO(), dbDSN)
 	rep := &Repository{
 		storage: storage,
 		db:      conn,

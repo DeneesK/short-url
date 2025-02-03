@@ -18,6 +18,7 @@ func main() {
 	storage := memorystorage.NewMemoryStorage(conf.MemoryUsageLimitBytes)
 	rep, err := repository.NewRepository(
 		storage,
+		conf.DBDSN,
 		repository.AddDumpFile(conf.FileStoragePath),
 		repository.RestoreFromDump(conf.FileStoragePath),
 	)
