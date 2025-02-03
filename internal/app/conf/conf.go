@@ -14,7 +14,7 @@ type ServerConf struct {
 	BaseURL               string
 	Env                   string
 	FileStoragePath       string
-	DBURL                 string
+	DBDSN                 string
 	MemoryUsageLimitBytes uint64
 }
 
@@ -26,6 +26,7 @@ func MustLoad() *ServerConf {
 	flag.Float64Var(&limit, "memlimit", 1, "memory usage limit in Gb")
 	flag.StringVar(&cfg.Env, "env", "dev", "environment: dev or prod")
 	flag.StringVar(&cfg.FileStoragePath, "f", "./file_storage.json", "environment: dev or prod")
+	flag.StringVar(&cfg.DBDSN, "d", "", "database dsn")
 	flag.Parse()
 
 	cfg.MemoryUsageLimitBytes = uint64(limit * gbyte)
@@ -52,7 +53,7 @@ func MustLoad() *ServerConf {
 		cfg.FileStoragePath = filiname
 	}
 	if dbURL, ok := os.LookupEnv("DATABASE_DSN"); ok {
-		cfg.DBURL = dbURL
+		cfg.DBDSN = dbURL
 	}
 	return &cfg
 }
