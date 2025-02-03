@@ -18,6 +18,7 @@ const (
 type Repository interface {
 	Store(id, value string) error
 	Get(id string) (string, error)
+	PingDB() error
 }
 
 type URLShortener struct {
@@ -69,4 +70,8 @@ func (s *URLShortener) FindByShortened(id string) (string, error) {
 		return "", nil
 	}
 	return shortURL, nil
+}
+
+func (s *URLShortener) PingDB() error {
+	return s.rep.PingDB()
 }

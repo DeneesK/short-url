@@ -2,8 +2,12 @@ package repository
 
 import (
 	"bufio"
+	"context"
+	"database/sql"
 	"encoding/json"
 	"os"
+
+	"github.com/DeneesK/short-url/internal/app/storage/postgres"
 )
 
 const filePerm = 0644
@@ -22,13 +26,16 @@ type Repository struct {
 	storage Storage
 	file    *os.File
 	encoder *json.Encoder
+	db      *sql.DB
 }
 
 type Option func(*Repository) error
 
-func NewRepository(storage Storage, opts ...Option) (*Repository, error) {
+func NewRepository(storage Storage, dbDSN string, opts ...Option) (*Repository, error) {
+	conn := postgres.NewConnection(context.TODO(), dbDSN)
 	rep := &Repository{
 		storage: storage,
+		db:      conn,
 	}
 
 	for _, opt := range opts {
@@ -95,7 +102,15 @@ func (rep *Repository) Get(id string) (string, error) {
 	return rep.storage.Get(id)
 }
 
+func (rep *Repository) PingDB() error {
+	return rep.db.Ping()
+}
+
 func (rep *Repository) Close() error {
+	err := rep.db.Close()
+	if err != nil {
+		return err
+	}
 	return rep.file.Close()
 }
 
