@@ -43,12 +43,12 @@ func (a *APP) Run() {
 
 	<-ctx.Done()
 
-	log.Print("application shutdown process...")
+	log.Println("application shutdown process...")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	if err := a.srv.Shutdown(shutdownCtx); err != nil {
 		log.Fatalf("Error during shutdown: %s", err)
 	}
 	<-shutdownCtx.Done()
-	log.Print("application and server gracefully stopped")
+	log.Println("application and server gracefully stopped")
 }

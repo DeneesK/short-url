@@ -1,14 +1,16 @@
 package router
 
 import (
+	"context"
+
 	"github.com/DeneesK/short-url/internal/app/router/middlewares"
 	"github.com/go-chi/chi/v5"
 )
 
 type URLService interface {
-	ShortenURL(string) (string, error)
-	FindByShortened(string) (string, error)
-	PingDB() error
+	ShortenURL(context.Context, string) (string, error)
+	FindByShortened(context.Context, string) (string, error)
+	PingDB(context.Context) error
 }
 
 type Logger interface {

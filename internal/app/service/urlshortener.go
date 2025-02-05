@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -16,9 +17,9 @@ const (
 )
 
 type Repository interface {
-	Store(id, value string) error
-	Get(id string) (string, error)
-	PingDB() error
+	Store(ctx context.Context, id, value string) error
+	Get(ctx context.Context, id string) (string, error)
+	PingDB(ctx context.Context) error
 }
 
 type URLShortener struct {
@@ -33,7 +34,7 @@ func NewURLShortener(storage Repository, baseAddr string) *URLShortener {
 	}
 }
 
-func (s *URLShortener) ShortenURL(longURL string) (string, error) {
+func (s *URLShortener) ShortenURL(ctx context.Context, longURL string) (string, error) {
 	var alias string
 	var err error
 	if isValid := validator.IsValidURL(longURL); !isValid {
@@ -43,7 +44,7 @@ func (s *URLShortener) ShortenURL(longURL string) (string, error) {
 	for i := 0; i < maxRetries; i++ {
 		alias = random.RandomString(idLength)
 
-		err = s.rep.Store(alias, longURL)
+		err = s.rep.Store(ctx, alias, longURL)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotUniqueID) {
 				continue
@@ -64,14 +65,14 @@ func (s *URLShortener) ShortenURL(longURL string) (string, error) {
 	return shortURL, nil
 }
 
-func (s *URLShortener) FindByShortened(id string) (string, error) {
-	shortURL, err := s.rep.Get(id)
+func (s *URLShortener) FindByShortened(ctx context.Context, id string) (string, error) {
+	shortURL, err := s.rep.Get(ctx, id)
 	if err != nil {
 		return "", nil
 	}
 	return shortURL, nil
 }
 
-func (s *URLShortener) PingDB() error {
-	return s.rep.PingDB()
+func (s *URLShortener) PingDB(ctx context.Context) error {
+	return s.rep.PingDB(ctx)
 }

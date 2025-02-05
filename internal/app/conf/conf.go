@@ -15,6 +15,7 @@ type ServerConf struct {
 	Env                   string
 	FileStoragePath       string
 	DBDSN                 string
+	MigrationsPath        string
 	MemoryUsageLimitBytes uint64
 }
 
@@ -25,8 +26,9 @@ func MustLoad() *ServerConf {
 	flag.StringVar(&cfg.BaseURL, "b", "http://localhost:8080", "base address of the resulting shortened URL")
 	flag.Float64Var(&limit, "memlimit", 1, "memory usage limit in Gb")
 	flag.StringVar(&cfg.Env, "env", "dev", "environment: dev or prod")
-	flag.StringVar(&cfg.FileStoragePath, "f", "./file_storage.json", "environment: dev or prod")
+	flag.StringVar(&cfg.FileStoragePath, "f", "", "filepath to store dump")
 	flag.StringVar(&cfg.DBDSN, "d", "", "database dsn")
+	flag.StringVar(&cfg.MigrationsPath, "mp", "file://migrations", "path to migrations, exp.: file://migrations")
 	flag.Parse()
 
 	cfg.MemoryUsageLimitBytes = uint64(limit * gbyte)

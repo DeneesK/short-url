@@ -3,14 +3,22 @@ package repository
 import (
 	"bufio"
 	"context"
-	"database/sql"
 	"encoding/json"
 	"os"
 
+	"github.com/DeneesK/short-url/internal/app/storage/memorystorage"
 	"github.com/DeneesK/short-url/internal/app/storage/postgres"
 )
 
+// TODO CONF and OPTS RE-CHECK!
+
 const filePerm = 0644
+
+type StorageConfig struct {
+	DBDSN           string
+	MigrationSource string
+	MaxStorageSize  uint64
+}
 
 type row struct {
 	ShortURL string `json:"short_url"`
@@ -18,24 +26,34 @@ type row struct {
 }
 
 type Storage interface {
-	Store(id, value string) error
-	Get(id string) (string, error)
+	Store(ctx context.Context, id, value string) error
+	Get(ctx context.Context, id string) (string, error)
+	Close(ctx context.Context) error
+	Ping(ctx context.Context) error
 }
 
 type Repository struct {
 	storage Storage
 	file    *os.File
 	encoder *json.Encoder
-	db      *sql.DB
 }
 
 type Option func(*Repository) error
 
-func NewRepository(storage Storage, dbDSN string, opts ...Option) (*Repository, error) {
-	conn := postgres.NewConnection(context.TODO(), dbDSN)
+func NewRepository(conf StorageConfig, opts ...Option) (*Repository, error) {
+	var storage Storage
+	if conf.DBDSN != "" {
+		ctx := context.Background()
+		storage = postgres.NewDBConnection(
+			ctx, conf.DBDSN,
+			conf.MaxStorageSize,
+			postgres.RunMigrations(conf.MigrationSource, conf.DBDSN),
+		)
+	} else {
+		storage = memorystorage.NewMemoryStorage(conf.MaxStorageSize)
+	}
 	rep := &Repository{
 		storage: storage,
-		db:      conn,
 	}
 
 	for _, opt := range opts {
@@ -49,6 +67,9 @@ func NewRepository(storage Storage, dbDSN string, opts ...Option) (*Repository, 
 
 func AddDumpFile(dumpFilePath string) Option {
 	return func(rep *Repository) error {
+		if dumpFilePath == "" {
+			return nil
+		}
 		file, err := os.OpenFile(dumpFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, filePerm)
 		if err != nil {
 			return err
@@ -61,6 +82,9 @@ func AddDumpFile(dumpFilePath string) Option {
 
 func RestoreFromDump(dumpFilePath string) Option {
 	return func(rep *Repository) error {
+		if dumpFilePath == "" {
+			return nil
+		}
 		file, err := os.OpenFile(dumpFilePath, os.O_RDONLY, filePerm)
 		if err != nil {
 			return err
@@ -75,8 +99,7 @@ func RestoreFromDump(dumpFilePath string) Option {
 			if err != nil {
 				return err
 			}
-
-			err = rep.storage.Store(r.ShortURL, r.LongURL)
+			err = rep.storage.Store(context.Background(), r.ShortURL, r.LongURL)
 			if err != nil {
 				return err
 			}
@@ -86,8 +109,8 @@ func RestoreFromDump(dumpFilePath string) Option {
 	}
 }
 
-func (rep *Repository) Store(id, value string) error {
-	if err := rep.storage.Store(id, value); err != nil {
+func (rep *Repository) Store(ctx context.Context, id, value string) error {
+	if err := rep.storage.Store(ctx, id, value); err != nil {
 		return err
 	}
 	if rep.encoder != nil {
@@ -98,16 +121,16 @@ func (rep *Repository) Store(id, value string) error {
 	return nil
 }
 
-func (rep *Repository) Get(id string) (string, error) {
-	return rep.storage.Get(id)
+func (rep *Repository) Get(ctx context.Context, id string) (string, error) {
+	return rep.storage.Get(ctx, id)
 }
 
-func (rep *Repository) PingDB() error {
-	return rep.db.Ping()
+func (rep *Repository) PingDB(ctx context.Context) error {
+	return rep.storage.Ping(ctx)
 }
 
-func (rep *Repository) Close() error {
-	err := rep.db.Close()
+func (rep *Repository) Close(ctx context.Context) error {
+	err := rep.storage.Close(ctx)
 	if err != nil {
 		return err
 	}

@@ -29,7 +29,7 @@ func URLShortener(urlService URLService, log Logger) http.HandlerFunc {
 
 		longURL := string(body)
 
-		shortURL, err := urlService.ShortenURL(longURL)
+		shortURL, err := urlService.ShortenURL(r.Context(), longURL)
 		if err != nil {
 			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())
 			log.Error(errorString)
@@ -54,7 +54,7 @@ func URLShortenerJSON(urlService URLService, log Logger) http.HandlerFunc {
 			return
 		}
 
-		shortURL, err := urlService.ShortenURL(longURL.URL)
+		shortURL, err := urlService.ShortenURL(r.Context(), longURL.URL)
 		if err != nil {
 			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())
 			log.Error(errorString)
@@ -87,7 +87,7 @@ func URLRedirect(urlService URLService, log Logger) http.HandlerFunc {
 			return
 		}
 
-		url, err := urlService.FindByShortened(id)
+		url, err := urlService.FindByShortened(r.Context(), id)
 		if err != nil {
 			errorString := fmt.Sprintf("failed to redirect: %s", err.Error())
 			log.Error(errorString)
@@ -102,7 +102,7 @@ func URLRedirect(urlService URLService, log Logger) http.HandlerFunc {
 
 func PingDB(urlService URLService, log Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		err := urlService.PingDB()
+		err := urlService.PingDB(r.Context())
 		if err != nil {
 			log.Errorf("failed to ping db: %s", err)
 			http.Error(w, "database is not available", http.StatusInternalServerError)

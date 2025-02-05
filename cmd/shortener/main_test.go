@@ -2,15 +2,15 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"sync"
+	"strings"
 	"testing"
 
 	"github.com/DeneesK/short-url/internal/app/repository"
@@ -25,6 +25,7 @@ import (
 const (
 	baseAddr = "http://localhosr:8000"
 	testID   = "test-id"
+	wrongID  = "wrong-id"
 )
 
 type row struct {
@@ -32,43 +33,21 @@ type row struct {
 	LongURL  string `json:"long_url"`
 }
 
-type mockStorage struct {
+type ShortenerURLServiceMock struct {
 	mock.Mock
 }
 
-func (m *mockStorage) Store(id, value string) error {
-	args := m.Called(id, value)
-	return args.Error(0)
+func (m *ShortenerURLServiceMock) ShortenURL(ctx context.Context, value string) (string, error) {
+	args := m.Called(value)
+	return args.String(0), args.Error(1)
 }
 
-func (m *mockStorage) Get(id string) (string, error) {
+func (m *ShortenerURLServiceMock) FindByShortened(ctx context.Context, id string) (string, error) {
 	args := m.Called(id)
 	return args.String(0), args.Error(1)
 }
 
-type ShortenerURLServiceMock struct {
-	m       sync.RWMutex
-	storage map[string]string
-}
-
-func (r *ShortenerURLServiceMock) ShortenURL(value string) (string, error) {
-	r.m.Lock()
-	defer r.m.Unlock()
-	r.storage[testID] = value
-	return testID, nil
-}
-
-func (r *ShortenerURLServiceMock) FindByShortened(id string) (string, error) {
-	r.m.RLock()
-	defer r.m.RUnlock()
-	v, ok := r.storage[id]
-	if !ok {
-		return "", fmt.Errorf("url not found by id: %v", id)
-	}
-	return v, nil
-}
-
-func (r *ShortenerURLServiceMock) PingDB() error {
+func (r *ShortenerURLServiceMock) PingDB(ctx context.Context) error {
 	return nil
 }
 
@@ -87,11 +66,15 @@ func testRequest(t *testing.T, ts *httptest.Server, method, path string, body []
 }
 
 func TestRouter(t *testing.T) {
-	rep := &ShortenerURLServiceMock{storage: make(map[string]string)}
+	rep := &ShortenerURLServiceMock{}
 	logger, err := zap.NewDevelopment()
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	rep.On("ShortenURL", "http://example.com").Return(testID, nil)
+	rep.On("FindByShortened", testID).Return("http://example.com", nil)
+	rep.On("FindByShortened", wrongID).Return("", errors.New("id not found"))
 
 	sugar := *logger.Sugar()
 
@@ -176,25 +159,19 @@ func TestRepository_Initializing(t *testing.T) {
 	var testTable = []struct {
 		name    string
 		options []repository.Option
-		storage *mockStorage
 	}{
 		{
-			name:    "without any options",
-			storage: &mockStorage{},
+			name: "without any options",
 		},
 		{
 			name:    "only with dump file",
-			storage: &mockStorage{},
 			options: []repository.Option{repository.AddDumpFile(file.Name())},
 		},
 		{
 			name:    "only restore from dump file",
-			storage: &mockStorage{},
 			options: []repository.Option{repository.RestoreFromDump(file.Name())},
 		},
 		{
-			name:    "with all options",
-			storage: &mockStorage{},
 			options: []repository.Option{
 				repository.RestoreFromDump(file.Name()),
 				repository.AddDumpFile(file.Name()),
@@ -204,32 +181,30 @@ func TestRepository_Initializing(t *testing.T) {
 
 	for _, v := range testTable {
 		t.Run(v.name, func(t *testing.T) {
-			_, err := repository.NewRepository(v.storage, "")
+			_, err := repository.NewRepository(repository.StorageConfig{})
 			assert.NoError(t, err)
 		})
 	}
 }
 
-func TestRepository_Get(t *testing.T) {
-	storage := &mockStorage{}
-	storage.On("Get", "short").Return("long", nil)
-	repo, _ := repository.NewRepository(storage, "")
-
-	result, err := repo.Get("short")
-
+func TestRepository_Store(t *testing.T) {
+	repo, err := repository.NewRepository(repository.StorageConfig{})
 	assert.NoError(t, err)
-	assert.Equal(t, "long", result)
-	storage.AssertCalled(t, "Get", "short")
+	err = repo.Store(context.TODO(), "id", "url")
+	assert.NoError(t, err)
 }
 
-func TestRepository_Store(t *testing.T) {
-	storage := &mockStorage{}
-	storage.On("Store", "short").Return("long", nil)
-	repo, err := repository.NewRepository(storage, "")
+func TestRepository_Get(t *testing.T) {
+	repo, err := repository.NewRepository(repository.StorageConfig{MaxStorageSize: 100_000})
 	assert.NoError(t, err)
-	storage.On("Store", "short", "long").Return(nil)
-	err = repo.Store("short", "long")
+
+	err = repo.Store(context.TODO(), "id", "url")
 	assert.NoError(t, err)
+
+	result, err := repo.Get(context.TODO(), "id")
+
+	assert.NoError(t, err)
+	assert.Equal(t, "url", result)
 }
 
 func TestRepository_StoreToFile(t *testing.T) {
@@ -238,11 +213,9 @@ func TestRepository_StoreToFile(t *testing.T) {
 	assert.NoError(t, err)
 	defer os.Remove(file.Name())
 
-	storage := &mockStorage{}
-	repo, err := repository.NewRepository(storage, "", repository.AddDumpFile(file.Name()))
+	repo, err := repository.NewRepository(repository.StorageConfig{MaxStorageSize: 100_000}, repository.AddDumpFile(file.Name()))
 	assert.NoError(t, err)
-	storage.On("Store", "short", "long").Return(nil)
-	err = repo.Store("short", "long")
+	err = repo.Store(context.TODO(), "short", "long")
 	assert.NoError(t, err)
 
 	var storedRow row
@@ -270,15 +243,12 @@ func TestRepository_RestoreFromDump(t *testing.T) {
 
 	file.Close()
 
-	storage := &mockStorage{}
-	storage.On("Store", "short1", "long1").Return(nil)
-	storage.On("Store", "short2", "long2").Return(nil)
-
-	_, err = repository.NewRepository(storage, "", repository.RestoreFromDump(file.Name()))
+	rep, err := repository.NewRepository(repository.StorageConfig{MaxStorageSize: 100_000}, repository.RestoreFromDump(file.Name()))
 	assert.NoError(t, err)
 
-	storage.AssertCalled(t, "Store", "short1", "long1")
-	storage.AssertCalled(t, "Store", "short2", "long2")
+	result, err := rep.Get(context.TODO(), "short1")
+	assert.NoError(t, err)
+	assert.Equal(t, "long1", result)
 }
 
 func TestRepository_Close(t *testing.T) {
@@ -287,50 +257,38 @@ func TestRepository_Close(t *testing.T) {
 	assert.NoError(t, err)
 	defer os.Remove(file.Name())
 
-	storage := &mockStorage{}
-	repo, err := repository.NewRepository(storage, "", repository.AddDumpFile(file.Name()))
+	repo, err := repository.NewRepository(repository.StorageConfig{MaxStorageSize: 100_000}, repository.AddDumpFile(file.Name()))
 	assert.NoError(t, err)
 
-	err = repo.Close()
+	err = repo.Close(context.TODO())
 	assert.NoError(t, err)
-}
-
-func TestRepository_StoreWithError(t *testing.T) {
-	storage := &mockStorage{}
-	storage.On("Store", "short", "long").Return(errors.New("storage error"))
-	repo, _ := repository.NewRepository(storage, "")
-
-	err := repo.Store("short", "long")
-
-	assert.Error(t, err)
-	assert.Equal(t, "storage error", err.Error())
 }
 
 func TestURLShortenerService(t *testing.T) {
 	longValidURL := "https://validurl.com"
 	longNOTValidURL := "NOT valid url.com"
-	storage := &mockStorage{}
-	storage.On("Store", mock.Anything, mock.Anything).Return(nil)
-	storage.On("Get", testID).Return(longValidURL, nil)
-	repo, err := repository.NewRepository(storage, "")
+	repo, err := repository.NewRepository(repository.StorageConfig{MaxStorageSize: 100_000})
 	assert.NoError(t, err)
 
 	ser := service.NewURLShortener(repo, baseAddr)
 
 	t.Run("Shorten valid url", func(t *testing.T) {
-		shortURL, err := ser.ShortenURL(longValidURL)
+		shortURL, err := ser.ShortenURL(context.TODO(), longValidURL)
 		assert.NoError(t, err)
 		assert.NotEqual(t, shortURL, longValidURL)
 		assert.Contains(t, shortURL, baseAddr)
 	})
 
 	t.Run("Shorten NOT valid url", func(t *testing.T) {
-		_, err := ser.ShortenURL(longNOTValidURL)
+		_, err := ser.ShortenURL(context.TODO(), longNOTValidURL)
 		assert.Error(t, err)
 	})
 
 	t.Run("Find by Alias(Shortened)", func(t *testing.T) {
-		res, err := ser.FindByShortened(testID)
+		shortURL, err := ser.ShortenURL(context.TODO(), longValidURL)
+		assert.NoError(t, err)
+		id := (strings.Split(shortURL, baseAddr+"/"))[1]
+		res, err := ser.FindByShortened(context.TODO(), id)
 		assert.NoError(t, err)
 		assert.Equal(t, longValidURL, res)
 	})
