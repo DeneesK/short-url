@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/DeneesK/short-url/internal/app/dto"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -97,6 +98,38 @@ func URLRedirect(urlService URLService, log Logger) http.HandlerFunc {
 
 		w.Header().Set("Location", url)
 		http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+	}
+}
+
+func URLShortenerBatchJSON(urlService URLService, log Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		batch := make([]dto.OriginalURL, 0)
+
+		err := json.NewDecoder(r.Body).Decode(&batch)
+		if err != nil {
+			log.Errorf("failed to decode request's body %s", err)
+			http.Error(w, "failed to decode request's body", http.StatusBadRequest)
+			return
+		}
+
+		result, err := urlService.StoreBatchURL(r.Context(), batch)
+		if err != nil {
+			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())
+			log.Error(errorString)
+			http.Error(w, errorString, http.StatusBadRequest)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+
+		err = json.NewEncoder(w).Encode(result)
+		if err != nil {
+			errorString := fmt.Sprintf("failed to encode short url: %s", err.Error())
+			log.Error(errorString)
+			http.Error(w, errorString, http.StatusBadRequest)
+			return
+		}
 	}
 }
 

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/DeneesK/short-url/internal/app/dto"
 	"github.com/DeneesK/short-url/internal/app/repository"
 	"github.com/DeneesK/short-url/internal/app/router"
 	"github.com/DeneesK/short-url/internal/app/service"
@@ -49,6 +50,10 @@ func (m *ShortenerURLServiceMock) FindByShortened(ctx context.Context, id string
 
 func (m *ShortenerURLServiceMock) PingDB(ctx context.Context) error {
 	return nil
+}
+
+func (m *ShortenerURLServiceMock) StoreBatchURL(ctx context.Context, batch []dto.OriginalURL) ([]dto.ShortedURL, error) {
+	return nil, nil
 }
 
 func testRequest(t *testing.T, ts *httptest.Server, method, path string, body []byte) (*http.Response, string) {

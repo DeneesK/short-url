@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/DeneesK/short-url/internal/app/dto"
 	"github.com/DeneesK/short-url/internal/app/storage"
 	"github.com/DeneesK/short-url/pkg/random"
 	"github.com/DeneesK/short-url/pkg/validator"
@@ -73,6 +74,24 @@ func (s *URLShortener) FindByShortened(ctx context.Context, id string) (string, 
 	return shortURL, nil
 }
 
+func (s *URLShortener) StoreBatchURL(ctx context.Context, batch []dto.OriginalURL) ([]dto.ShortedURL, error) {
+	result := make([]dto.ShortedURL, 0)
+	for _, origin := range batch {
+		if isValid := validator.IsValidURL(origin.URL); !isValid {
+			return nil, fmt.Errorf("this url: '%s' is not valid url", origin.URL)
+		}
+		err := s.rep.Store(ctx, origin.ID, origin.URL)
+		if err != nil {
+			return nil, err
+		}
+		shortURL, err := url.JoinPath(s.baseAddr, origin.ID)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, dto.ShortedURL{ID: origin.ID, URL: shortURL})
+	}
+	return result, nil
+}
 func (s *URLShortener) PingDB(ctx context.Context) error {
 	return s.rep.PingDB(ctx)
 }
