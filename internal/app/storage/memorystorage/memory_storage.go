@@ -1,6 +1,7 @@
 package memorystorage
 
 import (
+	"context"
 	"sync"
 
 	"github.com/DeneesK/short-url/internal/app/storage"
@@ -15,7 +16,15 @@ type MemoryStorage struct {
 	maxStorageSize   uint64
 }
 
-func (s *MemoryStorage) Store(id, value string) error {
+func NewMemoryStorage(maxStorageSize uint64) *MemoryStorage {
+	return &MemoryStorage{
+		m:              sync.RWMutex{},
+		storage:        make(map[string]string),
+		maxStorageSize: maxStorageSize,
+	}
+}
+
+func (s *MemoryStorage) Store(ctx context.Context, id, value string) error {
 	s.m.Lock()
 	defer s.m.Unlock()
 
@@ -30,7 +39,7 @@ func (s *MemoryStorage) Store(id, value string) error {
 	return nil
 }
 
-func (s *MemoryStorage) Get(id string) (string, error) {
+func (s *MemoryStorage) Get(ctx context.Context, id string) (string, error) {
 	s.m.RLock()
 	v, ok := s.storage[id]
 	s.m.RUnlock()
@@ -38,6 +47,14 @@ func (s *MemoryStorage) Get(id string) (string, error) {
 		return "", nil
 	}
 	return v, nil
+}
+
+func (s *MemoryStorage) Ping(ctx context.Context) error {
+	return nil
+}
+
+func (s *MemoryStorage) Close(ctx context.Context) error {
+	return nil
 }
 
 func (s *MemoryStorage) isExists(id string) bool {
@@ -51,12 +68,4 @@ func (s *MemoryStorage) updateSize(newRow ...string) {
 		size += uint64(len(s)) + stringOverhead
 	}
 	s.currentBytesSize += size
-}
-
-func NewMemoryStorage(maxStorageSize uint64) *MemoryStorage {
-	return &MemoryStorage{
-		m:              sync.RWMutex{},
-		storage:        make(map[string]string),
-		maxStorageSize: maxStorageSize,
-	}
 }
