@@ -47,7 +47,7 @@ func (m *ShortenerURLServiceMock) FindByShortened(ctx context.Context, id string
 	return args.String(0), args.Error(1)
 }
 
-func (r *ShortenerURLServiceMock) PingDB(ctx context.Context) error {
+func (m *ShortenerURLServiceMock) PingDB(ctx context.Context) error {
 	return nil
 }
 
