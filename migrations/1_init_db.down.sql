@@ -1,0 +1,1 @@
+DROP TABLE shorten_url;
