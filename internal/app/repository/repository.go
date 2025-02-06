@@ -27,6 +27,7 @@ type row struct {
 
 type Storage interface {
 	Store(ctx context.Context, id, value string) error
+	StoreBatch(ctx context.Context, batch [][2]string) error
 	Get(ctx context.Context, id string) (string, error)
 	Close(ctx context.Context) error
 	Ping(ctx context.Context) error
@@ -118,6 +119,34 @@ func (rep *Repository) Store(ctx context.Context, id, value string) error {
 			return err
 		}
 	}
+	return nil
+}
+
+func (rep *Repository) StoreBatch(ctx context.Context, batch [][2]string) error {
+	const chunkSize = 1000
+
+	for i := 0; i < len(batch); i += chunkSize {
+		end := i + chunkSize
+		if end > len(batch) {
+			end = len(batch)
+		}
+
+		chunk := batch[i:end]
+
+		err := rep.storage.StoreBatch(ctx, chunk)
+		if err != nil {
+			return err
+		}
+
+		if rep.encoder != nil {
+			for _, entry := range chunk {
+				if err := rep.storeToFile(entry[0], entry[1]); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
 	return nil
 }
 

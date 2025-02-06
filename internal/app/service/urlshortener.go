@@ -19,6 +19,7 @@ const (
 
 type Repository interface {
 	Store(ctx context.Context, id, value string) error
+	StoreBatch(context.Context, [][2]string) error
 	Get(ctx context.Context, id string) (string, error)
 	PingDB(ctx context.Context) error
 }
@@ -75,21 +76,25 @@ func (s *URLShortener) FindByShortened(ctx context.Context, id string) (string, 
 }
 
 func (s *URLShortener) StoreBatchURL(ctx context.Context, batch []dto.OriginalURL) ([]dto.ShortedURL, error) {
-	result := make([]dto.ShortedURL, 0)
+	result := make([]dto.ShortedURL, 0, len(batch))
+	chunk := make([][2]string, 0, len(batch))
 	for _, origin := range batch {
 		if isValid := validator.IsValidURL(origin.URL); !isValid {
 			return nil, fmt.Errorf("this url: '%s' is not valid url", origin.URL)
 		}
-		err := s.rep.Store(ctx, origin.ID, origin.URL)
-		if err != nil {
-			return nil, err
-		}
+		chunk = append(chunk, [2]string{origin.ID, origin.URL})
 		shortURL, err := url.JoinPath(s.baseAddr, origin.ID)
 		if err != nil {
 			return nil, err
 		}
 		result = append(result, dto.ShortedURL{ID: origin.ID, URL: shortURL})
 	}
+
+	err := s.rep.StoreBatch(ctx, chunk)
+	if err != nil {
+		return nil, err
+	}
+
 	return result, nil
 }
 func (s *URLShortener) PingDB(ctx context.Context) error {

@@ -66,6 +66,25 @@ func (s *PostgresStorage) Store(ctx context.Context, id, value string) error {
 	return nil
 }
 
+func (s *PostgresStorage) StoreBatch(ctx context.Context, batch [][2]string) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	stmt, err := tx.PrepareContext(ctx, "INSERT INTO shorten_url (alias, long_url) VALUES ($1, $2)")
+	if err != nil {
+		return err
+	}
+	for _, entity := range batch {
+		_, err := stmt.ExecContext(ctx, entity[0], entity[1])
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 func (s *PostgresStorage) Get(ctx context.Context, id string) (string, error) {
 	query := "SELECT long_url FROM shorten_url WHERE alias = $1"
 	var longURL string

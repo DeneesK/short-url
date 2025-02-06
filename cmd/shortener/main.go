@@ -29,7 +29,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to initialized repository: %s", err)
 	}
-	ctx, close := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, close := context.WithTimeout(context.Background(), 1*time.Second)
 	defer close()
 	defer rep.Close(ctx)
 

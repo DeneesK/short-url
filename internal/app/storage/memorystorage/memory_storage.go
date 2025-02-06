@@ -39,6 +39,16 @@ func (s *MemoryStorage) Store(ctx context.Context, id, value string) error {
 	return nil
 }
 
+func (rep *MemoryStorage) StoreBatch(ctx context.Context, batch [][2]string) error {
+	for _, entity := range batch {
+		err := rep.Store(ctx, entity[0], entity[1])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *MemoryStorage) Get(ctx context.Context, id string) (string, error) {
 	s.m.RLock()
 	v, ok := s.storage[id]
