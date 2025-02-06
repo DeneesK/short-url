@@ -12,16 +12,18 @@ import (
 	"github.com/DeneesK/short-url/pkg/validator"
 )
 
+var ErrLongURLAlreadyExists = errors.New("long URL already exists")
+
 const (
 	maxRetries = 3
 	idLength   = 8
 )
 
 type Repository interface {
-	Store(ctx context.Context, id, value string) error
+	Store(context.Context, string, string) (string, error)
 	StoreBatch(context.Context, [][2]string) error
-	Get(ctx context.Context, id string) (string, error)
-	PingDB(ctx context.Context) error
+	Get(context.Context, string) (string, error)
+	PingDB(context.Context) error
 }
 
 type URLShortener struct {
@@ -46,10 +48,16 @@ func (s *URLShortener) ShortenURL(ctx context.Context, longURL string) (string, 
 	for i := 0; i < maxRetries; i++ {
 		alias = random.RandomString(idLength)
 
-		err = s.rep.Store(ctx, alias, longURL)
+		alias, err = s.rep.Store(ctx, alias, longURL)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotUniqueID) {
 				continue
+			} else if errors.Is(err, storage.ErrUniqueViolation) {
+				shortURL, err := url.JoinPath(s.baseAddr, alias)
+				if err != nil {
+					return "", err
+				}
+				return shortURL, ErrLongURLAlreadyExists
 			} else {
 				return "", err
 			}

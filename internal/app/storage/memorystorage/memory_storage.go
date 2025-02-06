@@ -24,24 +24,32 @@ func NewMemoryStorage(maxStorageSize uint64) *MemoryStorage {
 	}
 }
 
-func (s *MemoryStorage) Store(ctx context.Context, id, value string) error {
+func (s *MemoryStorage) Store(ctx context.Context, id, value string) (string, error) {
 	s.m.Lock()
 	defer s.m.Unlock()
 
 	if s.isExists(id) {
-		return storage.ErrNotUniqueID
-	} else if s.currentBytesSize > s.maxStorageSize {
-		return storage.ErrStorageLimitExceeded
+		return "", storage.ErrNotUniqueID
+	}
+
+	for _id, v := range s.storage {
+		if v == value {
+			return _id, storage.ErrUniqueViolation
+		}
+	}
+
+	if s.currentBytesSize > s.maxStorageSize {
+		return "", storage.ErrStorageLimitExceeded
 	}
 
 	s.storage[id] = value
 	s.updateSize(id, value)
-	return nil
+	return id, nil
 }
 
 func (s *MemoryStorage) StoreBatch(ctx context.Context, batch [][2]string) error {
 	for _, entity := range batch {
-		err := s.Store(ctx, entity[0], entity[1])
+		_, err := s.Store(ctx, entity[0], entity[1])
 		if err != nil {
 			return err
 		}

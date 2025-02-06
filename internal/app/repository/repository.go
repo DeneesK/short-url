@@ -26,7 +26,7 @@ type row struct {
 }
 
 type Storage interface {
-	Store(ctx context.Context, id, value string) error
+	Store(context.Context, string, string) (string, error)
 	StoreBatch(ctx context.Context, batch [][2]string) error
 	Get(ctx context.Context, id string) (string, error)
 	Close(ctx context.Context) error
@@ -100,7 +100,7 @@ func RestoreFromDump(dumpFilePath string) Option {
 			if err != nil {
 				return err
 			}
-			err = rep.storage.Store(context.Background(), r.ShortURL, r.LongURL)
+			_, err = rep.storage.Store(context.Background(), r.ShortURL, r.LongURL)
 			if err != nil {
 				return err
 			}
@@ -110,16 +110,16 @@ func RestoreFromDump(dumpFilePath string) Option {
 	}
 }
 
-func (rep *Repository) Store(ctx context.Context, id, value string) error {
-	if err := rep.storage.Store(ctx, id, value); err != nil {
-		return err
+func (rep *Repository) Store(ctx context.Context, id, value string) (string, error) {
+	if id, err := rep.storage.Store(ctx, id, value); err != nil {
+		return id, err
 	}
 	if rep.encoder != nil {
 		if err := rep.storeToFile(id, value); err != nil {
-			return err
+			return "", err
 		}
 	}
-	return nil
+	return id, nil
 }
 
 func (rep *Repository) StoreBatch(ctx context.Context, batch [][2]string) error {

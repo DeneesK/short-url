@@ -195,7 +195,7 @@ func TestRepository_Initializing(t *testing.T) {
 func TestRepository_Store(t *testing.T) {
 	repo, err := repository.NewRepository(repository.StorageConfig{})
 	assert.NoError(t, err)
-	err = repo.Store(context.TODO(), "id", "url")
+	_, err = repo.Store(context.TODO(), "id", "url")
 	assert.NoError(t, err)
 }
 
@@ -203,7 +203,7 @@ func TestRepository_Get(t *testing.T) {
 	repo, err := repository.NewRepository(repository.StorageConfig{MaxStorageSize: 100_000})
 	assert.NoError(t, err)
 
-	err = repo.Store(context.TODO(), "id", "url")
+	_, err = repo.Store(context.TODO(), "id", "url")
 	assert.NoError(t, err)
 
 	result, err := repo.Get(context.TODO(), "id")
@@ -220,7 +220,7 @@ func TestRepository_StoreToFile(t *testing.T) {
 
 	repo, err := repository.NewRepository(repository.StorageConfig{MaxStorageSize: 100_000}, repository.AddDumpFile(file.Name()))
 	assert.NoError(t, err)
-	err = repo.Store(context.TODO(), "short", "long")
+	_, err = repo.Store(context.TODO(), "short", "long")
 	assert.NoError(t, err)
 
 	var storedRow row

@@ -50,20 +50,30 @@ func RunMigrations(migrationSource, dbDSN string) Option {
 	}
 }
 
-func (s *PostgresStorage) Store(ctx context.Context, id, value string) error {
+func (s *PostgresStorage) Store(ctx context.Context, id, value string) (string, error) {
 	currentSize, err := s.getDBSize(ctx)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if currentSize > s.maxStorageSize {
-		return storage.ErrStorageLimitExceeded
+		return "", storage.ErrStorageLimitExceeded
 	}
+
+	var existingID string
+	checkQuery := "SELECT alias FROM shorten_url WHERE long_url = $1"
+	err = s.db.QueryRowContext(ctx, checkQuery, value).Scan(&existingID)
+	if err == nil {
+		return existingID, storage.ErrUniqueViolation
+	} else if err != sql.ErrNoRows {
+		return "", err
+	}
+
 	query := "INSERT INTO shorten_url (alias, long_url) VALUES ($1, $2)"
 	_, err = s.db.ExecContext(ctx, query, id, value)
 	if err != nil {
-		return err
+		return "", err
 	}
-	return nil
+	return id, nil
 }
 
 func (s *PostgresStorage) StoreBatch(ctx context.Context, batch [][2]string) error {
