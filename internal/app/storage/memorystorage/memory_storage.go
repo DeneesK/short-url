@@ -39,9 +39,9 @@ func (s *MemoryStorage) Store(ctx context.Context, id, value string) error {
 	return nil
 }
 
-func (rep *MemoryStorage) StoreBatch(ctx context.Context, batch [][2]string) error {
+func (s *MemoryStorage) StoreBatch(ctx context.Context, batch [][2]string) error {
 	for _, entity := range batch {
-		err := rep.Store(ctx, entity[0], entity[1])
+		err := s.Store(ctx, entity[0], entity[1])
 		if err != nil {
 			return err
 		}
