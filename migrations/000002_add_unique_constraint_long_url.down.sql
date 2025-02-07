@@ -1,0 +1,2 @@
+ALTER TABLE shorten_url
+DROP CONSTRAINT long_url_unique_constraint;
