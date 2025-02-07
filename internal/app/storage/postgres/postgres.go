@@ -59,20 +59,18 @@ func (s *PostgresStorage) Store(ctx context.Context, id, value string) (string, 
 		return "", storage.ErrStorageLimitExceeded
 	}
 
-	var existingID string
-	checkQuery := "SELECT alias FROM shorten_url WHERE long_url = $1"
-	err = s.db.QueryRowContext(ctx, checkQuery, value).Scan(&existingID)
-	if err == nil {
-		return existingID, storage.ErrUniqueViolation
-	} else if err != sql.ErrNoRows {
-		return "", err
-	}
+	query := "INSERT INTO shorten_url (alias, long_url) VALUES ($1, $2) ON CONFLICT (long_url) DO UPDATE SET alias = shorten_url.alias RETURNING alias"
+	var alias string
 
-	query := "INSERT INTO shorten_url (alias, long_url) VALUES ($1, $2)"
-	_, err = s.db.ExecContext(ctx, query, id, value)
+	err = s.db.QueryRowContext(ctx, query, id, value).Scan(&alias)
 	if err != nil {
 		return "", err
 	}
+
+	if alias != id {
+		return alias, storage.ErrUniqueViolation
+	}
+
 	return id, nil
 }
 

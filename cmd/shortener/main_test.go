@@ -271,6 +271,7 @@ func TestRepository_Close(t *testing.T) {
 
 func TestURLShortenerService(t *testing.T) {
 	longValidURL := "https://validurl.com"
+	longValidURL2 := "https://validurl2.com"
 	longNOTValidURL := "NOT valid url.com"
 	repo, err := repository.NewRepository(repository.StorageConfig{MaxStorageSize: 100_000})
 	assert.NoError(t, err)
@@ -289,12 +290,17 @@ func TestURLShortenerService(t *testing.T) {
 		assert.Error(t, err)
 	})
 
+	t.Run("Shorten EXISTS valid long url", func(t *testing.T) {
+		_, err := ser.ShortenURL(context.TODO(), longValidURL)
+		assert.ErrorIs(t, service.ErrLongURLAlreadyExists, err)
+	})
+
 	t.Run("Find by Alias(Shortened)", func(t *testing.T) {
-		shortURL, err := ser.ShortenURL(context.TODO(), longValidURL)
+		shortURL, err := ser.ShortenURL(context.TODO(), longValidURL2)
 		assert.NoError(t, err)
 		id := (strings.Split(shortURL, baseAddr+"/"))[1]
 		res, err := ser.FindByShortened(context.TODO(), id)
 		assert.NoError(t, err)
-		assert.Equal(t, longValidURL, res)
+		assert.Equal(t, longValidURL2, res)
 	})
 }

@@ -4,13 +4,13 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 
+	"github.com/DeneesK/short-url/internal/app/storage"
 	"github.com/DeneesK/short-url/internal/app/storage/memorystorage"
 	"github.com/DeneesK/short-url/internal/app/storage/postgres"
 )
-
-// TODO CONF and OPTS RE-CHECK!
 
 const filePerm = 0644
 
@@ -111,8 +111,10 @@ func RestoreFromDump(dumpFilePath string) Option {
 }
 
 func (rep *Repository) Store(ctx context.Context, id, value string) (string, error) {
-	if id, err := rep.storage.Store(ctx, id, value); err != nil {
-		return id, err
+	if alias, err := rep.storage.Store(ctx, id, value); err != nil && err != storage.ErrUniqueViolation {
+		return "", err
+	} else if errors.Is(err, storage.ErrUniqueViolation) {
+		return alias, storage.ErrUniqueViolation
 	}
 	if rep.encoder != nil {
 		if err := rep.storeToFile(id, value); err != nil {

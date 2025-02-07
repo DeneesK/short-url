@@ -85,12 +85,12 @@ func (s *URLShortener) FindByShortened(ctx context.Context, id string) (string, 
 
 func (s *URLShortener) StoreBatchURL(ctx context.Context, batch []dto.OriginalURL) ([]dto.ShortedURL, error) {
 	result := make([]dto.ShortedURL, 0, len(batch))
-	chunk := make([][2]string, 0, len(batch))
+	data := make([][2]string, 0, len(batch))
 	for _, origin := range batch {
 		if isValid := validator.IsValidURL(origin.URL); !isValid {
 			return nil, fmt.Errorf("this url: '%s' is not valid url", origin.URL)
 		}
-		chunk = append(chunk, [2]string{origin.ID, origin.URL})
+		data = append(data, [2]string{origin.ID, origin.URL})
 		shortURL, err := url.JoinPath(s.baseAddr, origin.ID)
 		if err != nil {
 			return nil, err
@@ -98,7 +98,7 @@ func (s *URLShortener) StoreBatchURL(ctx context.Context, batch []dto.OriginalUR
 		result = append(result, dto.ShortedURL{ID: origin.ID, URL: shortURL})
 	}
 
-	err := s.rep.StoreBatch(ctx, chunk)
+	err := s.rep.StoreBatch(ctx, data)
 	if err != nil {
 		return nil, err
 	}

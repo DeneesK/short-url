@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/DeneesK/short-url/internal/app/dto"
+	"github.com/DeneesK/short-url/internal/app/service"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -31,15 +32,18 @@ func URLShortener(urlService URLService, log Logger) http.HandlerFunc {
 		longURL := string(body)
 
 		shortURL, err := urlService.ShortenURL(r.Context(), longURL)
-		if err != nil {
+		if err != nil && err != service.ErrLongURLAlreadyExists {
 			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())
 			log.Error(errorString)
 			http.Error(w, errorString, http.StatusBadRequest)
 			return
+		} else if err == service.ErrLongURLAlreadyExists {
+			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(http.StatusConflict)
+		} else {
+			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(http.StatusCreated)
 		}
-
-		w.Header().Set("Content-Type", "text/plain")
-		w.WriteHeader(http.StatusCreated)
 		w.Write([]byte(shortURL))
 	}
 }
@@ -56,17 +60,19 @@ func URLShortenerJSON(urlService URLService, log Logger) http.HandlerFunc {
 		}
 
 		shortURL, err := urlService.ShortenURL(r.Context(), longURL.URL)
-		if err != nil {
+		if err != nil && err != service.ErrLongURLAlreadyExists {
 			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())
 			log.Error(errorString)
 			http.Error(w, errorString, http.StatusBadRequest)
 			return
+		} else if err == service.ErrLongURLAlreadyExists {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusConflict)
+		} else {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
 		}
-
 		res := ShortURL{Result: shortURL}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
 
 		err = json.NewEncoder(w).Encode(res)
 		if err != nil {
