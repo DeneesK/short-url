@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"time"
 
 	"github.com/DeneesK/short-url/internal/app"
 	"github.com/DeneesK/short-url/internal/app/conf"
@@ -29,13 +28,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to initialized repository: %s", err)
 	}
-	ctx, close := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, close := context.WithCancel(context.Background())
 	defer close()
 	defer rep.Close(ctx)
 
 	service := service.NewURLShortener(rep, conf.BaseURL)
 	router := router.NewRouter(service, log)
 
-	app := app.NewApp(conf.ServerAddr, router)
+	app := app.NewApp(conf.ServerAddr, router, log)
 	app.Run()
 }

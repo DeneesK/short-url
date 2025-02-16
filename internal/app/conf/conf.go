@@ -19,9 +19,10 @@ type ServerConf struct {
 	MemoryUsageLimitBytes uint64
 }
 
-func MustLoad() *ServerConf {
-	var limit float64
-	var cfg ServerConf
+var cfg ServerConf
+var limit float64
+
+func init() {
 	flag.StringVar(&cfg.ServerAddr, "a", "localhost:8080", "address and port to run server")
 	flag.StringVar(&cfg.BaseURL, "b", "http://localhost:8080", "base address of the resulting shortened URL")
 	flag.Float64Var(&limit, "memlimit", 1, "memory usage limit in Gb")
@@ -29,9 +30,13 @@ func MustLoad() *ServerConf {
 	flag.StringVar(&cfg.FileStoragePath, "f", "", "filepath to store dump")
 	flag.StringVar(&cfg.DBDSN, "d", "", "database dsn")
 	flag.StringVar(&cfg.MigrationsPath, "mp", "file://migrations", "path to migrations, exp.: file://migrations")
+}
+
+func MustLoad() *ServerConf {
 	flag.Parse()
 
 	cfg.MemoryUsageLimitBytes = uint64(limit * gbyte)
+
 	if serverAddr, ok := os.LookupEnv("SERVER_ADDRESS"); ok {
 		cfg.ServerAddr = serverAddr
 	}
@@ -51,11 +56,12 @@ func MustLoad() *ServerConf {
 	if env, ok := os.LookupEnv("ENV"); ok {
 		cfg.Env = env
 	}
-	if filiname, ok := os.LookupEnv("FILE_STORAGE_PATH"); ok {
-		cfg.FileStoragePath = filiname
+	if filename, ok := os.LookupEnv("FILE_STORAGE_PATH"); ok {
+		cfg.FileStoragePath = filename
 	}
 	if dbURL, ok := os.LookupEnv("DATABASE_DSN"); ok {
 		cfg.DBDSN = dbURL
 	}
+
 	return &cfg
 }

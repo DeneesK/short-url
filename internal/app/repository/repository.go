@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 
+	"github.com/DeneesK/short-url/internal/app/dto"
 	"github.com/DeneesK/short-url/internal/app/storage"
 	"github.com/DeneesK/short-url/internal/app/storage/memorystorage"
 	"github.com/DeneesK/short-url/internal/app/storage/postgres"
@@ -27,7 +28,7 @@ type row struct {
 
 type Storage interface {
 	Store(context.Context, string, string) (string, error)
-	StoreBatch(ctx context.Context, batch [][2]string) error
+	StoreBatch(ctx context.Context, batch []dto.OriginalURL) error
 	Get(ctx context.Context, id string) (string, error)
 	Close(ctx context.Context) error
 	Ping(ctx context.Context) error
@@ -47,7 +48,6 @@ func NewRepository(conf StorageConfig, opts ...Option) (*Repository, error) {
 		ctx := context.Background()
 		storage = postgres.NewDBConnection(
 			ctx, conf.DBDSN,
-			conf.MaxStorageSize,
 			postgres.RunMigrations(conf.MigrationSource, conf.DBDSN),
 		)
 	} else {
@@ -124,27 +124,17 @@ func (rep *Repository) Store(ctx context.Context, id, value string) (string, err
 	return id, nil
 }
 
-func (rep *Repository) StoreBatch(ctx context.Context, batch [][2]string) error {
-	const chunkSize = 1000
+func (rep *Repository) StoreBatch(ctx context.Context, batch []dto.OriginalURL) error {
 
-	for i := 0; i < len(batch); i += chunkSize {
-		end := i + chunkSize
-		if end > len(batch) {
-			end = len(batch)
-		}
+	err := rep.storage.StoreBatch(ctx, batch)
+	if err != nil {
+		return err
+	}
 
-		chunk := batch[i:end]
-
-		err := rep.storage.StoreBatch(ctx, chunk)
-		if err != nil {
-			return err
-		}
-
-		if rep.encoder != nil {
-			for _, entry := range chunk {
-				if err := rep.storeToFile(entry[0], entry[1]); err != nil {
-					return err
-				}
+	if rep.encoder != nil {
+		for _, entry := range batch {
+			if err := rep.storeToFile(entry.ID, entry.URL); err != nil {
+				return err
 			}
 		}
 	}
@@ -165,7 +155,10 @@ func (rep *Repository) Close(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return rep.file.Close()
+	if rep.file != nil {
+		return rep.file.Close()
+	}
+	return nil
 }
 
 func (rep *Repository) storeToFile(id, value string) error {

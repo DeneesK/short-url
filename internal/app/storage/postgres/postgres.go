@@ -3,8 +3,11 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
+	"strings"
 
+	"github.com/DeneesK/short-url/internal/app/dto"
 	"github.com/DeneesK/short-url/internal/app/storage"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -13,18 +16,17 @@ import (
 )
 
 type PostgresStorage struct {
-	db             *sql.DB
-	maxStorageSize uint64
+	db *sql.DB
 }
 
 type Option func(*PostgresStorage) error
 
-func NewDBConnection(ctx context.Context, dbDSN string, maxStorageSize uint64, opts ...Option) *PostgresStorage {
+func NewDBConnection(ctx context.Context, dbDSN string, opts ...Option) *PostgresStorage {
 	db, err := sql.Open("pgx", dbDSN)
 	if err != nil {
 		log.Fatalf("Unable to connect to database: %v", err)
 	}
-	s := &PostgresStorage{db: db, maxStorageSize: maxStorageSize}
+	s := &PostgresStorage{db: db}
 	for _, opt := range opts {
 		err := opt(s)
 		if err != nil {
@@ -51,18 +53,10 @@ func RunMigrations(migrationSource, dbDSN string) Option {
 }
 
 func (s *PostgresStorage) Store(ctx context.Context, id, value string) (string, error) {
-	currentSize, err := s.getDBSize(ctx)
-	if err != nil {
-		return "", err
-	}
-	if currentSize > s.maxStorageSize {
-		return "", storage.ErrStorageLimitExceeded
-	}
-
 	query := "INSERT INTO shorten_url (alias, long_url) VALUES ($1, $2) ON CONFLICT (long_url) DO UPDATE SET alias = shorten_url.alias RETURNING alias"
 	var alias string
 
-	err = s.db.QueryRowContext(ctx, query, id, value).Scan(&alias)
+	err := s.db.QueryRowContext(ctx, query, id, value).Scan(&alias)
 	if err != nil {
 		return "", err
 	}
@@ -74,22 +68,40 @@ func (s *PostgresStorage) Store(ctx context.Context, id, value string) (string, 
 	return id, nil
 }
 
-func (s *PostgresStorage) StoreBatch(ctx context.Context, batch [][2]string) error {
+func (s *PostgresStorage) StoreBatch(ctx context.Context, batch []dto.OriginalURL) error {
+	const chunkSize = 1000
+
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
 	}
-	stmt, err := tx.PrepareContext(ctx, "INSERT INTO shorten_url (alias, long_url) VALUES ($1, $2)")
-	if err != nil {
-		return err
-	}
-	for _, entity := range batch {
-		_, err := stmt.ExecContext(ctx, entity[0], entity[1])
+	defer tx.Rollback()
+
+	for i := 0; i < len(batch); i += chunkSize {
+		end := i + chunkSize
+		if end > len(batch) {
+			end = len(batch)
+		}
+
+		chunk := batch[i:end]
+		var queryBuilder strings.Builder
+		queryBuilder.WriteString("INSERT INTO shorten_url (alias, long_url) VALUES ")
+
+		params := []interface{}{}
+		for j, row := range chunk {
+			if j > 0 {
+				queryBuilder.WriteString(", ")
+			}
+			queryBuilder.WriteString(fmt.Sprintf("($%d, $%d)", 2*j+1, 2*j+2))
+			params = append(params, row.ID, row.URL)
+		}
+
+		_, err = tx.ExecContext(ctx, queryBuilder.String(), params...)
 		if err != nil {
-			tx.Rollback()
 			return err
 		}
 	}
+
 	return tx.Commit()
 }
 
@@ -109,16 +121,4 @@ func (s *PostgresStorage) Ping(ctx context.Context) error {
 
 func (s *PostgresStorage) Close(ctx context.Context) error {
 	return s.db.Close()
-}
-
-func (s *PostgresStorage) getDBSize(ctx context.Context) (uint64, error) {
-	var size uint64
-	query := "SELECT pg_database_size(current_database());"
-
-	err := s.db.QueryRowContext(ctx, query).Scan(&size)
-	if err != nil {
-		return 0, err
-	}
-
-	return size, nil
 }

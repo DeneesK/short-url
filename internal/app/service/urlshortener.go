@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"time"
 
 	"github.com/DeneesK/short-url/internal/app/dto"
 	"github.com/DeneesK/short-url/internal/app/storage"
@@ -17,11 +18,12 @@ var ErrLongURLAlreadyExists = errors.New("long URL already exists")
 const (
 	maxRetries = 3
 	idLength   = 8
+	sleepTime  = 100
 )
 
 type Repository interface {
 	Store(context.Context, string, string) (string, error)
-	StoreBatch(context.Context, [][2]string) error
+	StoreBatch(context.Context, []dto.OriginalURL) error
 	Get(context.Context, string) (string, error)
 	PingDB(context.Context) error
 }
@@ -59,13 +61,14 @@ func (s *URLShortener) ShortenURL(ctx context.Context, longURL string) (string, 
 				}
 				return shortURL, ErrLongURLAlreadyExists
 			} else {
-				return "", err
+				time.Sleep(sleepTime * time.Millisecond)
+				continue
 			}
 		}
 		break
 	}
 	if err != nil {
-		return "", fmt.Errorf("failed to generate unique alias after %d attempts", maxRetries)
+		return "", fmt.Errorf("failed to store shorten URL after %d attempts, reason: %q", maxRetries, err)
 	}
 
 	shortURL, err := url.JoinPath(s.baseAddr, alias)
@@ -85,12 +88,10 @@ func (s *URLShortener) FindByShortened(ctx context.Context, id string) (string, 
 
 func (s *URLShortener) StoreBatchURL(ctx context.Context, batch []dto.OriginalURL) ([]dto.ShortedURL, error) {
 	result := make([]dto.ShortedURL, 0, len(batch))
-	data := make([][2]string, 0, len(batch))
 	for _, origin := range batch {
 		if isValid := validator.IsValidURL(origin.URL); !isValid {
-			return nil, fmt.Errorf("this url: '%s' is not valid url", origin.URL)
+			return nil, fmt.Errorf("%q is not valid url", origin.URL)
 		}
-		data = append(data, [2]string{origin.ID, origin.URL})
 		shortURL, err := url.JoinPath(s.baseAddr, origin.ID)
 		if err != nil {
 			return nil, err
@@ -98,7 +99,7 @@ func (s *URLShortener) StoreBatchURL(ctx context.Context, batch []dto.OriginalUR
 		result = append(result, dto.ShortedURL{ID: origin.ID, URL: shortURL})
 	}
 
-	err := s.rep.StoreBatch(ctx, data)
+	err := s.rep.StoreBatch(ctx, batch)
 	if err != nil {
 		return nil, err
 	}
