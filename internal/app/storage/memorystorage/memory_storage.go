@@ -30,7 +30,7 @@ func (s *MemoryStorage) Store(ctx context.Context, id, value string) (string, er
 	s.m.Lock()
 	defer s.m.Unlock()
 
-	if s.isIdExists(id) {
+	if s.isIDExists(id) {
 		return "", storage.ErrNotUniqueID
 	}
 
@@ -72,7 +72,7 @@ func (s *MemoryStorage) Close(ctx context.Context) error {
 	return nil
 }
 
-func (s *MemoryStorage) isIdExists(id string) bool {
+func (s *MemoryStorage) isIDExists(id string) bool {
 	_, e := s.storage[id]
 	return e
 }
