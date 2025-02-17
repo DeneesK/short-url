@@ -28,3 +28,4 @@ file_storage*
 
 # MacOS
 .DS_Store
+.env

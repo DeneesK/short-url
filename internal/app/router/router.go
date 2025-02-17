@@ -1,13 +1,18 @@
 package router
 
 import (
+	"context"
+
+	"github.com/DeneesK/short-url/internal/app/dto"
 	"github.com/DeneesK/short-url/internal/app/router/middlewares"
 	"github.com/go-chi/chi/v5"
 )
 
 type URLService interface {
-	ShortenURL(string) (string, error)
-	FindByShortened(string) (string, error)
+	ShortenURL(context.Context, string) (string, error)
+	StoreBatchURL(context.Context, []dto.OriginalURL) ([]dto.ShortedURL, error)
+	FindByShortened(context.Context, string) (string, error)
+	PingDB(context.Context) error
 }
 
 type Logger interface {
@@ -25,8 +30,10 @@ func NewRouter(service URLService, log Logger) *chi.Mux {
 	r.Use(loggingMiddleware, gzipReqDecodeMiddleware, gzipRespEncodeMiddleware)
 
 	r.Post("/", URLShortener(service, log))
+	r.Post("/api/shorten/batch", URLShortenerBatchJSON(service, log))
 	r.Post("/api/shorten", URLShortenerJSON(service, log))
 	r.Get("/{id}", URLRedirect(service, log))
+	r.Get("/ping", PingDB(service, log))
 
 	return r
 }

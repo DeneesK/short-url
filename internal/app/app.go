@@ -11,16 +11,22 @@ import (
 
 const shutdownTimeout = time.Second * 1
 
-type APP struct {
-	srv *http.Server
+type Logger interface {
+	Infoln(args ...interface{})
+	Fatalf(format string, v ...any)
 }
 
-func NewApp(addr string, handler http.Handler) *APP {
+type APP struct {
+	srv *http.Server
+	log Logger
+}
+
+func NewApp(addr string, handler http.Handler, log Logger) *APP {
 	s := http.Server{
 		Addr:    addr,
 		Handler: handler,
 	}
-	return &APP{srv: &s}
+	return &APP{srv: &s, log: log}
 }
 
 func (a *APP) Run() {
@@ -32,23 +38,23 @@ func (a *APP) Run() {
 	)
 	defer stop()
 
-	log.Println("starting app, server listening on", a.srv.Addr)
+	a.log.Infoln("starting app, server listening on", a.srv.Addr)
 
 	go func() {
 		err := a.srv.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
-			log.Fatalf("failed to start server: %s", err)
+			a.log.Fatalf("failed to start server: %s", err)
 		}
 	}()
 
 	<-ctx.Done()
 
-	log.Print("application shutdown process...")
+	a.log.Infoln("application shutdown process...")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	if err := a.srv.Shutdown(shutdownCtx); err != nil {
 		log.Fatalf("Error during shutdown: %s", err)
 	}
 	<-shutdownCtx.Done()
-	log.Print("application and server gracefully stopped")
+	a.log.Infoln("application and server gracefully stopped")
 }

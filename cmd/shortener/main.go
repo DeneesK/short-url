@@ -1,13 +1,14 @@
 package main
 
 import (
+	"context"
+
 	"github.com/DeneesK/short-url/internal/app"
 	"github.com/DeneesK/short-url/internal/app/conf"
 	"github.com/DeneesK/short-url/internal/app/logger"
 	"github.com/DeneesK/short-url/internal/app/repository"
 	"github.com/DeneesK/short-url/internal/app/router"
 	"github.com/DeneesK/short-url/internal/app/service"
-	"github.com/DeneesK/short-url/internal/app/storage/memorystorage"
 )
 
 func main() {
@@ -15,21 +16,25 @@ func main() {
 
 	log := logger.NewLogger(conf.Env)
 	defer log.Sync()
-
-	storage := memorystorage.NewMemoryStorage(conf.MemoryUsageLimitBytes)
 	rep, err := repository.NewRepository(
-		storage,
+		repository.StorageConfig{
+			DBDSN:           conf.DBDSN,
+			MaxStorageSize:  conf.MemoryUsageLimitBytes,
+			MigrationSource: conf.MigrationsPath,
+		},
 		repository.AddDumpFile(conf.FileStoragePath),
 		repository.RestoreFromDump(conf.FileStoragePath),
 	)
 	if err != nil {
 		log.Fatalf("failed to initialized repository: %s", err)
 	}
-	defer rep.Close()
+	ctx, close := context.WithCancel(context.Background())
+	defer close()
+	defer rep.Close(ctx)
 
 	service := service.NewURLShortener(rep, conf.BaseURL)
 	router := router.NewRouter(service, log)
 
-	app := app.NewApp(conf.ServerAddr, router)
+	app := app.NewApp(conf.ServerAddr, router, log)
 	app.Run()
 }

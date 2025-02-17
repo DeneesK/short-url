@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/DeneesK/short-url/internal/app/dto"
+	"github.com/DeneesK/short-url/internal/app/service"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -29,16 +31,19 @@ func URLShortener(urlService URLService, log Logger) http.HandlerFunc {
 
 		longURL := string(body)
 
-		shortURL, err := urlService.ShortenURL(longURL)
-		if err != nil {
+		shortURL, err := urlService.ShortenURL(r.Context(), longURL)
+		if err != nil && err != service.ErrLongURLAlreadyExists {
 			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())
 			log.Error(errorString)
 			http.Error(w, errorString, http.StatusBadRequest)
 			return
+		} else if err == service.ErrLongURLAlreadyExists {
+			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(http.StatusConflict)
+		} else {
+			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(http.StatusCreated)
 		}
-
-		w.Header().Set("Content-Type", "text/plain")
-		w.WriteHeader(http.StatusCreated)
 		w.Write([]byte(shortURL))
 	}
 }
@@ -54,18 +59,20 @@ func URLShortenerJSON(urlService URLService, log Logger) http.HandlerFunc {
 			return
 		}
 
-		shortURL, err := urlService.ShortenURL(longURL.URL)
-		if err != nil {
+		shortURL, err := urlService.ShortenURL(r.Context(), longURL.URL)
+		if err != nil && err != service.ErrLongURLAlreadyExists {
 			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())
 			log.Error(errorString)
 			http.Error(w, errorString, http.StatusBadRequest)
 			return
+		} else if err == service.ErrLongURLAlreadyExists {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusConflict)
+		} else {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
 		}
-
 		res := ShortURL{Result: shortURL}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
 
 		err = json.NewEncoder(w).Encode(res)
 		if err != nil {
@@ -87,7 +94,7 @@ func URLRedirect(urlService URLService, log Logger) http.HandlerFunc {
 			return
 		}
 
-		url, err := urlService.FindByShortened(id)
+		url, err := urlService.FindByShortened(r.Context(), id)
 		if err != nil {
 			errorString := fmt.Sprintf("failed to redirect: %s", err.Error())
 			log.Error(errorString)
@@ -97,5 +104,49 @@ func URLRedirect(urlService URLService, log Logger) http.HandlerFunc {
 
 		w.Header().Set("Location", url)
 		http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+	}
+}
+
+func URLShortenerBatchJSON(urlService URLService, log Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		batch := make([]dto.OriginalURL, 0)
+
+		err := json.NewDecoder(r.Body).Decode(&batch)
+		if err != nil {
+			log.Errorf("failed to decode request's body %s", err)
+			http.Error(w, "failed to decode request's body", http.StatusBadRequest)
+			return
+		}
+
+		result, err := urlService.StoreBatchURL(r.Context(), batch)
+		if err != nil {
+			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())
+			log.Error(errorString)
+			http.Error(w, errorString, http.StatusBadRequest)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+
+		err = json.NewEncoder(w).Encode(result)
+		if err != nil {
+			errorString := fmt.Sprintf("failed to encode short url: %s", err.Error())
+			log.Error(errorString)
+			http.Error(w, errorString, http.StatusBadRequest)
+			return
+		}
+	}
+}
+
+func PingDB(urlService URLService, log Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		err := urlService.PingDB(r.Context())
+		if err != nil {
+			log.Errorf("failed to ping db: %s", err)
+			http.Error(w, "database is not available", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
 	}
 }
