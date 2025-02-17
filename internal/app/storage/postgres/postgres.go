@@ -3,12 +3,11 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log"
-	"strings"
 
 	"github.com/DeneesK/short-url/internal/app/dto"
 	"github.com/DeneesK/short-url/internal/app/storage"
+	sq "github.com/Masterminds/squirrel"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -70,6 +69,7 @@ func (s *PostgresStorage) Store(ctx context.Context, id, value string) (string, 
 
 func (s *PostgresStorage) StoreBatch(ctx context.Context, batch []dto.OriginalURL) error {
 	const chunkSize = 1000
+	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
 
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -84,19 +84,18 @@ func (s *PostgresStorage) StoreBatch(ctx context.Context, batch []dto.OriginalUR
 		}
 
 		chunk := batch[i:end]
-		var queryBuilder strings.Builder
-		queryBuilder.WriteString("INSERT INTO shorten_url (alias, long_url) VALUES ")
 
-		params := []interface{}{}
-		for j, row := range chunk {
-			if j > 0 {
-				queryBuilder.WriteString(", ")
-			}
-			queryBuilder.WriteString(fmt.Sprintf("($%d, $%d)", 2*j+1, 2*j+2))
-			params = append(params, row.ID, row.URL)
+		psql := psql.Insert("shorten_url").Columns("alias", "long_url")
+
+		for _, row := range chunk {
+			psql = psql.Values(row.ID, row.URL)
 		}
 
-		_, err = tx.ExecContext(ctx, queryBuilder.String(), params...)
+		query, args, err := psql.ToSql()
+		if err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, query, args...)
 		if err != nil {
 			return err
 		}
