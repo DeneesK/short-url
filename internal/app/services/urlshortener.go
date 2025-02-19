@@ -1,4 +1,4 @@
-package service
+package services
 
 import (
 	"context"
@@ -22,8 +22,9 @@ const (
 )
 
 type Repository interface {
-	Store(context.Context, string, string) (string, error)
-	StoreBatch(context.Context, []dto.OriginalURL) error
+	Store(ctx context.Context, id, value, userID string) (string, error)
+	StoreBatch(ctx context.Context, batch []dto.OriginalURL, userID string) error
+	GetByUserID(ctx context.Context, userID string) ([]dto.OriginalURL, error)
 	Get(context.Context, string) (string, error)
 	PingDB(context.Context) error
 }
@@ -40,7 +41,7 @@ func NewURLShortener(storage Repository, baseAddr string) *URLShortener {
 	}
 }
 
-func (s *URLShortener) ShortenURL(ctx context.Context, longURL string) (string, error) {
+func (s *URLShortener) ShortenURL(ctx context.Context, longURL, userID string) (string, error) {
 	var alias string
 	var err error
 	if isValid := validator.IsValidURL(longURL); !isValid {
@@ -50,7 +51,7 @@ func (s *URLShortener) ShortenURL(ctx context.Context, longURL string) (string, 
 	for i := 0; i < maxRetries; i++ {
 		alias = random.RandomString(idLength)
 
-		alias, err = s.rep.Store(ctx, alias, longURL)
+		alias, err = s.rep.Store(ctx, alias, longURL, userID)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotUniqueID) {
 				continue
@@ -79,14 +80,34 @@ func (s *URLShortener) ShortenURL(ctx context.Context, longURL string) (string, 
 }
 
 func (s *URLShortener) FindByShortened(ctx context.Context, id string) (string, error) {
-	shortURL, err := s.rep.Get(ctx, id)
+	originalURL, err := s.rep.Get(ctx, id)
 	if err != nil {
 		return "", nil
 	}
-	return shortURL, nil
+	return originalURL, nil
 }
 
-func (s *URLShortener) StoreBatchURL(ctx context.Context, batch []dto.OriginalURL) ([]dto.ShortedURL, error) {
+func (s *URLShortener) FindByUserID(ctx context.Context, userID string) ([]dto.URL, error) {
+	originalURLs, err := s.rep.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	urls := make([]dto.URL, 0)
+	for _, original := range originalURLs {
+		shortURL, err := url.JoinPath(s.baseAddr, original.ID)
+		if err != nil {
+			return nil, err
+		}
+		u := dto.URL{
+			OriginalURL: original.URL,
+			ShortURL:    shortURL,
+		}
+		urls = append(urls, u)
+	}
+	return urls, nil
+}
+
+func (s *URLShortener) StoreBatchURL(ctx context.Context, batch []dto.OriginalURL, userID string) ([]dto.ShortedURL, error) {
 	result := make([]dto.ShortedURL, 0, len(batch))
 	for _, origin := range batch {
 		if isValid := validator.IsValidURL(origin.URL); !isValid {
@@ -99,7 +120,7 @@ func (s *URLShortener) StoreBatchURL(ctx context.Context, batch []dto.OriginalUR
 		result = append(result, dto.ShortedURL{ID: origin.ID, URL: shortURL})
 	}
 
-	err := s.rep.StoreBatch(ctx, batch)
+	err := s.rep.StoreBatch(ctx, batch, userID)
 	if err != nil {
 		return nil, err
 	}

@@ -9,3 +9,8 @@ type ShortedURL struct {
 	ID  string `json:"correlation_id"`
 	URL string `json:"short_url"`
 }
+
+type URL struct {
+	OriginalURL string `json:"original_url"`
+	ShortURL    string `json:"short_url"`
+}

@@ -8,7 +8,7 @@ import (
 	"github.com/DeneesK/short-url/internal/app/logger"
 	"github.com/DeneesK/short-url/internal/app/repository"
 	"github.com/DeneesK/short-url/internal/app/router"
-	"github.com/DeneesK/short-url/internal/app/service"
+	"github.com/DeneesK/short-url/internal/app/services"
 )
 
 func main() {
@@ -32,8 +32,9 @@ func main() {
 	defer close()
 	defer rep.Close(ctx)
 
-	service := service.NewURLShortener(rep, conf.BaseURL)
-	router := router.NewRouter(service, log)
+	urlService := services.NewURLShortener(rep, conf.BaseURL)
+	userService := services.NewUserService(rep, conf.SecretKey)
+	router := router.NewRouter(urlService, userService, log)
 
 	app := app.NewApp(conf.ServerAddr, router, log)
 	app.Run()

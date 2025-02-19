@@ -5,10 +5,15 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/DeneesK/short-url/internal/app/dto"
-	"github.com/DeneesK/short-url/internal/app/service"
+	"github.com/DeneesK/short-url/internal/app/services"
 	"github.com/go-chi/chi/v5"
+)
+
+const (
+	cookieName = "user"
 )
 
 type LongURL struct {
@@ -30,14 +35,21 @@ func URLShortener(urlService URLService, log Logger) http.HandlerFunc {
 		defer r.Body.Close()
 
 		longURL := string(body)
-
-		shortURL, err := urlService.ShortenURL(r.Context(), longURL)
-		if err != nil && err != service.ErrLongURLAlreadyExists {
+		user, err := r.Cookie(cookieName)
+		if err != nil {
+			log.Errorf("failed request %s", err)
+			http.Error(w, "failed request", http.StatusBadRequest)
+			return
+		}
+		values := strings.Split(user.Value, ":")
+		userID := values[0]
+		shortURL, err := urlService.ShortenURL(r.Context(), longURL, userID)
+		if err != nil && err != services.ErrLongURLAlreadyExists {
 			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())
 			log.Error(errorString)
 			http.Error(w, errorString, http.StatusBadRequest)
 			return
-		} else if err == service.ErrLongURLAlreadyExists {
+		} else if err == services.ErrLongURLAlreadyExists {
 			w.Header().Set("Content-Type", "text/plain")
 			w.WriteHeader(http.StatusConflict)
 		} else {
@@ -58,14 +70,21 @@ func URLShortenerJSON(urlService URLService, log Logger) http.HandlerFunc {
 			http.Error(w, "failed to decode request's body", http.StatusBadRequest)
 			return
 		}
-
-		shortURL, err := urlService.ShortenURL(r.Context(), longURL.URL)
-		if err != nil && err != service.ErrLongURLAlreadyExists {
+		user, err := r.Cookie(cookieName)
+		if err != nil {
+			log.Errorf("failed request %s", err)
+			http.Error(w, "failed request", http.StatusBadRequest)
+			return
+		}
+		values := strings.Split(user.Value, ":")
+		userID := values[0]
+		shortURL, err := urlService.ShortenURL(r.Context(), longURL.URL, userID)
+		if err != nil && err != services.ErrLongURLAlreadyExists {
 			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())
 			log.Error(errorString)
 			http.Error(w, errorString, http.StatusBadRequest)
 			return
-		} else if err == service.ErrLongURLAlreadyExists {
+		} else if err == services.ErrLongURLAlreadyExists {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusConflict)
 		} else {
@@ -117,8 +136,15 @@ func URLShortenerBatchJSON(urlService URLService, log Logger) http.HandlerFunc {
 			http.Error(w, "failed to decode request's body", http.StatusBadRequest)
 			return
 		}
-
-		result, err := urlService.StoreBatchURL(r.Context(), batch)
+		user, err := r.Cookie(cookieName)
+		if err != nil {
+			log.Errorf("failed request %s", err)
+			http.Error(w, "failed request", http.StatusBadRequest)
+			return
+		}
+		values := strings.Split(user.Value, ":")
+		userID := values[0]
+		result, err := urlService.StoreBatchURL(r.Context(), batch, userID)
 		if err != nil {
 			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())
 			log.Error(errorString)
@@ -135,6 +161,37 @@ func URLShortenerBatchJSON(urlService URLService, log Logger) http.HandlerFunc {
 			log.Error(errorString)
 			http.Error(w, errorString, http.StatusBadRequest)
 			return
+		}
+	}
+}
+
+func URLsByUser(urlService URLService, userService UserService, log Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user, err := r.Cookie(cookieName)
+		if err != nil {
+			log.Errorf("failed to get cookie %s", err)
+			http.Error(w, "failed request", http.StatusBadRequest)
+			return
+		}
+		values := strings.Split(user.Value, ":")
+		userID := values[0]
+		urls, err := urlService.FindByUserID(r.Context(), userID)
+		if err != nil {
+			log.Errorf("failed request %s", err)
+			http.Error(w, "failed request", http.StatusBadRequest)
+			return
+		}
+		if len(urls) == 0 {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		err = json.NewEncoder(w).Encode(urls)
+		if err != nil {
+			errorString := fmt.Sprintf("failed to encode: %s", err.Error())
+			log.Error(errorString)
+			http.Error(w, errorString, http.StatusBadRequest)
 		}
 	}
 }
