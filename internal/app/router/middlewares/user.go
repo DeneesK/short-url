@@ -39,6 +39,26 @@ func NewUserCookieMiddleware(log Logger, userService UserService) func(http.Hand
 	}
 }
 
+func NewUserVerifyMiddleware(log Logger, userService UserService) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			user, err := r.Cookie(cookieName)
+			if err != nil {
+				log.Errorf("failed to get cookie %s", err)
+				http.Error(w, "failed request", http.StatusBadRequest)
+				return
+			}
+			if !userService.Verify(user.Value) {
+				log.Errorf("failed to verify user %s", user.Value)
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 func setCookie(w http.ResponseWriter, r *http.Request, value string) {
 	cookie := &http.Cookie{
 		Name:    cookieName,

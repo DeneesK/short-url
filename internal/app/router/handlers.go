@@ -173,11 +173,6 @@ func URLsByUser(urlService URLService, userService UserService, log Logger) http
 			http.Error(w, "failed request", http.StatusBadRequest)
 			return
 		}
-		if !userService.Verify(user.Value) {
-			log.Errorf("failed to verify user %s", user.Value)
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
 		values := strings.Split(user.Value, ":")
 		userID := values[0]
 		urls, err := urlService.FindByUserID(r.Context(), userID)

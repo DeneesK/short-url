@@ -34,7 +34,8 @@ func NewRouter(urlService URLService, userService UserService, log Logger) *chi.
 	gzipReqDecodeMiddleware := middlewares.NewRequestDecodeMiddleware(log)
 	gzipRespEncodeMiddleware := middlewares.NewResponseEncodeMiddleware(log)
 	userCookieMiddleware := middlewares.NewUserCookieMiddleware(log, userService)
-	r.Use(loggingMiddleware, gzipReqDecodeMiddleware, gzipRespEncodeMiddleware, userCookieMiddleware)
+	userVerifier := middlewares.NewUserVerifyMiddleware(log, userService)
+	r.Use(loggingMiddleware, gzipReqDecodeMiddleware, gzipRespEncodeMiddleware, userCookieMiddleware, userVerifier)
 
 	r.Post("/", URLShortener(urlService, log))
 	r.Post("/api/shorten/batch", URLShortenerBatchJSON(urlService, log))
