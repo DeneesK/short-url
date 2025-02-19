@@ -69,7 +69,7 @@ func (m *userServiceMock) Create(ctx context.Context) (string, error) {
 	return "user_id:user_id", nil
 }
 func (m *userServiceMock) Verify(user string) bool {
-	return false
+	return true
 }
 
 func testRequest(t *testing.T, ts *httptest.Server, method, path string, body []byte) (*http.Response, string) {
