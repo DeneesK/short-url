@@ -123,7 +123,7 @@ func (s *PostgresStorage) GetByUserID(ctx context.Context, userID string) ([]dto
 	if err != nil {
 		return nil, err
 	}
-
+	defer rows.Close()
 	urls := make([]dto.OriginalURL, 0)
 	for rows.Next() {
 		var longURL string
@@ -132,11 +132,12 @@ func (s *PostgresStorage) GetByUserID(ctx context.Context, userID string) ([]dto
 		if err != nil {
 			return nil, err
 		}
-
 		url := dto.OriginalURL{ID: alias, URL: longURL}
 		urls = append(urls, url)
 	}
-
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return urls, nil
 }
 

@@ -1,7 +1,7 @@
-CREATE EXTENSION "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 CREATE TABLE users (
-    id UUID DEFAULT gen_random_uuid();
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY
 );
 
 ALTER TABLE shorten_url
