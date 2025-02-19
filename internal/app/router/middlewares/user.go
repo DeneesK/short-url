@@ -20,8 +20,8 @@ func NewUserCookieMiddleware(log Logger, userService UserService) func(http.Hand
 	return func(next http.Handler) http.Handler {
 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			cookie, err := r.Cookie(cookieName)
-			if err == http.ErrNoCookie || !(userService.Verify(cookie.Value)) {
+			_, err := r.Cookie(cookieName)
+			if err == http.ErrNoCookie {
 				user, err := userService.Create(r.Context())
 				if err != nil {
 					log.Errorf("failed to create user %s", err)
@@ -29,6 +29,10 @@ func NewUserCookieMiddleware(log Logger, userService UserService) func(http.Hand
 					return
 				}
 				setCookie(w, r, user)
+			} else if err != nil {
+				log.Errorf("failed to get cookie %s", err)
+				http.Error(w, "failed request", http.StatusBadRequest)
+				return
 			}
 			next.ServeHTTP(w, r)
 		})

@@ -168,11 +168,8 @@ func URLShortenerBatchJSON(urlService URLService, log Logger) http.HandlerFunc {
 func URLsByUser(urlService URLService, userService UserService, log Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user, err := r.Cookie(cookieName)
-		if err == http.ErrNoCookie {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		} else if err != nil {
-			log.Errorf("failed request %s", err)
+		if err != nil {
+			log.Errorf("failed to get cookie %s", err)
 			http.Error(w, "failed request", http.StatusBadRequest)
 			return
 		}
