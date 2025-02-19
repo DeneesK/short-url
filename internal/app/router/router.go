@@ -9,10 +9,16 @@ import (
 )
 
 type URLService interface {
-	ShortenURL(context.Context, string) (string, error)
-	StoreBatchURL(context.Context, []dto.OriginalURL) ([]dto.ShortedURL, error)
+	ShortenURL(context.Context, string, string) (string, error)
+	StoreBatchURL(context.Context, []dto.OriginalURL, string) ([]dto.ShortedURL, error)
 	FindByShortened(context.Context, string) (string, error)
+	FindByUserID(context.Context, string) ([]dto.URL, error)
 	PingDB(context.Context) error
+}
+
+type UserService interface {
+	Create(ctx context.Context) (string, error)
+	Verify(user string) bool
 }
 
 type Logger interface {
@@ -21,19 +27,25 @@ type Logger interface {
 	Error(args ...interface{})
 }
 
-func NewRouter(service URLService, log Logger) *chi.Mux {
+func NewRouter(urlService URLService, userService UserService, log Logger) *chi.Mux {
 	r := chi.NewRouter()
 
 	loggingMiddleware := middlewares.NewLoggingMiddleware(log)
 	gzipReqDecodeMiddleware := middlewares.NewRequestDecodeMiddleware(log)
 	gzipRespEncodeMiddleware := middlewares.NewResponseEncodeMiddleware(log)
+	userCookieMiddleware := middlewares.NewUserCookieMiddleware(log, userService)
 	r.Use(loggingMiddleware, gzipReqDecodeMiddleware, gzipRespEncodeMiddleware)
 
-	r.Post("/", URLShortener(service, log))
-	r.Post("/api/shorten/batch", URLShortenerBatchJSON(service, log))
-	r.Post("/api/shorten", URLShortenerJSON(service, log))
-	r.Get("/{id}", URLRedirect(service, log))
-	r.Get("/ping", PingDB(service, log))
+	r.Group(func(router chi.Router) {
+		router.Use(userCookieMiddleware)
+		router.Post("/", URLShortener(urlService, log))
+		router.Post("/api/shorten/batch", URLShortenerBatchJSON(urlService, log))
+		router.Post("/api/shorten", URLShortenerJSON(urlService, log))
+	})
+
+	r.Get("/{id}", URLRedirect(urlService, log))
+	r.Get("/ping", PingDB(urlService, log))
+	r.Get("/api/user/urls", URLsByUser(urlService, log))
 
 	return r
 }

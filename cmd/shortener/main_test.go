@@ -16,7 +16,7 @@ import (
 	"github.com/DeneesK/short-url/internal/app/dto"
 	"github.com/DeneesK/short-url/internal/app/repository"
 	"github.com/DeneesK/short-url/internal/app/router"
-	"github.com/DeneesK/short-url/internal/app/service"
+	"github.com/DeneesK/short-url/internal/app/services"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -32,13 +32,14 @@ const (
 type row struct {
 	ShortURL string `json:"short_url"`
 	LongURL  string `json:"long_url"`
+	UserID   string `json:"user_id,omitempty"`
 }
 
 type ShortenerURLServiceMock struct {
 	mock.Mock
 }
 
-func (m *ShortenerURLServiceMock) ShortenURL(ctx context.Context, value string) (string, error) {
+func (m *ShortenerURLServiceMock) ShortenURL(ctx context.Context, value, userID string) (string, error) {
 	args := m.Called(value)
 	return args.String(0), args.Error(1)
 }
@@ -48,12 +49,27 @@ func (m *ShortenerURLServiceMock) FindByShortened(ctx context.Context, id string
 	return args.String(0), args.Error(1)
 }
 
+func (m *ShortenerURLServiceMock) FindByUserID(ctx context.Context, userID string) ([]dto.URL, error) {
+	return nil, nil
+}
+
 func (m *ShortenerURLServiceMock) PingDB(ctx context.Context) error {
 	return nil
 }
 
-func (m *ShortenerURLServiceMock) StoreBatchURL(ctx context.Context, batch []dto.OriginalURL) ([]dto.ShortedURL, error) {
+func (m *ShortenerURLServiceMock) StoreBatchURL(ctx context.Context, batch []dto.OriginalURL, userID string) ([]dto.ShortedURL, error) {
 	return nil, nil
+}
+
+type userServiceMock struct {
+	mock.Mock
+}
+
+func (m *userServiceMock) Create(ctx context.Context) (string, error) {
+	return "user_id:user_id", nil
+}
+func (m *userServiceMock) Verify(user string) bool {
+	return false
 }
 
 func testRequest(t *testing.T, ts *httptest.Server, method, path string, body []byte) (*http.Response, string) {
@@ -82,8 +98,8 @@ func TestRouter(t *testing.T) {
 	rep.On("FindByShortened", wrongID).Return("", errors.New("id not found"))
 
 	sugar := *logger.Sugar()
-
-	r := router.NewRouter(rep, &sugar)
+	userService := &userServiceMock{}
+	r := router.NewRouter(rep, userService, &sugar)
 	ts := httptest.NewServer(r)
 	defer ts.Close()
 
@@ -195,7 +211,7 @@ func TestRepository_Initializing(t *testing.T) {
 func TestRepository_Store(t *testing.T) {
 	repo, err := repository.NewRepository(repository.StorageConfig{})
 	assert.NoError(t, err)
-	_, err = repo.Store(context.TODO(), "id", "url")
+	_, err = repo.Store(context.TODO(), "id", "url", "user_id")
 	assert.NoError(t, err)
 }
 
@@ -203,7 +219,7 @@ func TestRepository_Get(t *testing.T) {
 	repo, err := repository.NewRepository(repository.StorageConfig{MaxStorageSize: 100_000})
 	assert.NoError(t, err)
 
-	_, err = repo.Store(context.TODO(), "id", "url")
+	_, err = repo.Store(context.TODO(), "id", "url", "user_id")
 	assert.NoError(t, err)
 
 	result, err := repo.Get(context.TODO(), "id")
@@ -217,10 +233,9 @@ func TestRepository_StoreToFile(t *testing.T) {
 	file, err := os.CreateTemp(tempDir, "*.json")
 	assert.NoError(t, err)
 	defer os.Remove(file.Name())
-
 	repo, err := repository.NewRepository(repository.StorageConfig{MaxStorageSize: 100_000}, repository.AddDumpFile(file.Name()))
 	assert.NoError(t, err)
-	_, err = repo.Store(context.TODO(), "short", "long")
+	_, err = repo.Store(context.TODO(), "short", "long", "user_id")
 	assert.NoError(t, err)
 
 	var storedRow row
@@ -229,6 +244,7 @@ func TestRepository_StoreToFile(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "short", storedRow.ShortURL)
 	assert.Equal(t, "long", storedRow.LongURL)
+	assert.Equal(t, "user_id", storedRow.UserID)
 }
 
 func TestRepository_RestoreFromDump(t *testing.T) {
@@ -238,8 +254,8 @@ func TestRepository_RestoreFromDump(t *testing.T) {
 	defer os.Remove(file.Name())
 
 	rows := []row{
-		{"short1", "long1"},
-		{"short2", "long2"},
+		{"short1", "long1", ""},
+		{"short2", "long2", ""},
 	}
 	for _, r := range rows {
 		data, _ := json.Marshal(r)
@@ -276,27 +292,27 @@ func TestURLShortenerService(t *testing.T) {
 	repo, err := repository.NewRepository(repository.StorageConfig{MaxStorageSize: 100_000})
 	assert.NoError(t, err)
 
-	ser := service.NewURLShortener(repo, baseAddr)
+	ser := services.NewURLShortener(repo, baseAddr)
 
 	t.Run("Shorten valid url", func(t *testing.T) {
-		shortURL, err := ser.ShortenURL(context.TODO(), longValidURL)
+		shortURL, err := ser.ShortenURL(context.TODO(), longValidURL, "user_id")
 		assert.NoError(t, err)
 		assert.NotEqual(t, shortURL, longValidURL)
 		assert.Contains(t, shortURL, baseAddr)
 	})
 
 	t.Run("Shorten NOT valid url", func(t *testing.T) {
-		_, err := ser.ShortenURL(context.TODO(), longNOTValidURL)
+		_, err := ser.ShortenURL(context.TODO(), longNOTValidURL, "user_id")
 		assert.Error(t, err)
 	})
 
 	t.Run("Shorten EXISTS valid long url", func(t *testing.T) {
-		_, err := ser.ShortenURL(context.TODO(), longValidURL)
-		assert.ErrorIs(t, service.ErrLongURLAlreadyExists, err)
+		_, err := ser.ShortenURL(context.TODO(), longValidURL, "user_id")
+		assert.ErrorIs(t, services.ErrLongURLAlreadyExists, err)
 	})
 
 	t.Run("Find by Alias(Shortened)", func(t *testing.T) {
-		shortURL, err := ser.ShortenURL(context.TODO(), longValidURL2)
+		shortURL, err := ser.ShortenURL(context.TODO(), longValidURL2, "user_id")
 		assert.NoError(t, err)
 		id := (strings.Split(shortURL, baseAddr+"/"))[1]
 		res, err := ser.FindByShortened(context.TODO(), id)
