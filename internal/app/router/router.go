@@ -36,7 +36,6 @@ func NewRouter(urlService URLService, userService UserService, log Logger) *chi.
 	userCookieMiddleware := middlewares.NewUserCookieMiddleware(log, userService)
 	r.Use(loggingMiddleware, gzipReqDecodeMiddleware, gzipRespEncodeMiddleware, userCookieMiddleware)
 
-	r.Use(userCookieMiddleware)
 	r.Post("/", URLShortener(urlService, log))
 	r.Post("/api/shorten/batch", URLShortenerBatchJSON(urlService, log))
 	r.Post("/api/shorten", URLShortenerJSON(urlService, log))
