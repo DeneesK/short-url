@@ -45,7 +45,7 @@ func NewRouter(urlService URLService, userService UserService, log Logger) *chi.
 
 	r.Get("/{id}", URLRedirect(urlService, log))
 	r.Get("/ping", PingDB(urlService, log))
-	r.Get("/api/user/urls", URLsByUser(urlService, log))
+	r.Get("/api/user/urls", URLsByUser(urlService, userService, log))
 
 	return r
 }

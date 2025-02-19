@@ -165,12 +165,20 @@ func URLShortenerBatchJSON(urlService URLService, log Logger) http.HandlerFunc {
 	}
 }
 
-func URLsByUser(urlService URLService, log Logger) http.HandlerFunc {
+func URLsByUser(urlService URLService, userService UserService, log Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user, err := r.Cookie(cookieName)
-		if err != nil {
+		if err == http.ErrNoCookie {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		} else if err != nil {
 			log.Errorf("failed request %s", err)
-			http.Error(w, "failed request", http.StatusUnauthorized)
+			http.Error(w, "failed request", http.StatusBadRequest)
+			return
+		}
+		if !userService.Verify(user.Value) {
+			log.Errorf("failed to verify user %s", user.Value)
+			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 		values := strings.Split(user.Value, ":")
@@ -178,21 +186,20 @@ func URLsByUser(urlService URLService, log Logger) http.HandlerFunc {
 		urls, err := urlService.FindByUserID(r.Context(), userID)
 		if err != nil {
 			log.Errorf("failed request %s", err)
-			http.Error(w, "failed request", http.StatusUnauthorized)
+			http.Error(w, "failed request", http.StatusBadRequest)
 			return
 		}
-		if len(urls) < 1 {
+		if len(urls) == 0 {
 			w.WriteHeader(http.StatusNoContent)
-		} else {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			err = json.NewEncoder(w).Encode(urls)
-			if err != nil {
-				errorString := fmt.Sprintf("failed to encode: %s", err.Error())
-				log.Error(errorString)
-				http.Error(w, errorString, http.StatusBadRequest)
-				return
-			}
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		err = json.NewEncoder(w).Encode(urls)
+		if err != nil {
+			errorString := fmt.Sprintf("failed to encode: %s", err.Error())
+			log.Error(errorString)
+			http.Error(w, errorString, http.StatusBadRequest)
 		}
 	}
 }
