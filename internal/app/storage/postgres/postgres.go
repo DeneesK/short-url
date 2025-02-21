@@ -167,7 +167,7 @@ func (s *PostgresStorage) UpdateStatusBatch(batch []dto.UpdateTask) error {
 
 		psql := psql.Update("shorten_url").
 			Set("is_deleted", true).
-			Where(sq.Eq{"id": ids, "user_id": userIDs})
+			Where(sq.Eq{"alias": ids, "user_id": userIDs})
 
 		query, args, err := psql.ToSql()
 		if err != nil {
