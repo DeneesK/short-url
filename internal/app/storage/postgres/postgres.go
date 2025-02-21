@@ -106,14 +106,14 @@ func (s *PostgresStorage) StoreBatch(ctx context.Context, batch []dto.OriginalUR
 	return tx.Commit()
 }
 
-func (s *PostgresStorage) Get(ctx context.Context, id string) (dto.LongUrl, error) {
+func (s *PostgresStorage) Get(ctx context.Context, id string) (dto.LongURL, error) {
 	query := "SELECT long_url, is_deleted FROM shorten_url WHERE alias = $1"
-	var longURL dto.LongUrl
-	err := s.db.QueryRowContext(ctx, query, id).Scan(&longURL)
+	var LongURL dto.LongURL
+	err := s.db.QueryRowContext(ctx, query, id).Scan(&LongURL)
 	if err != nil {
-		return dto.LongUrl{}, err
+		return dto.LongURL{}, err
 	}
-	return longURL, nil
+	return LongURL, nil
 }
 
 func (s *PostgresStorage) GetByUserID(ctx context.Context, userID string) ([]dto.OriginalURL, error) {
@@ -126,13 +126,13 @@ func (s *PostgresStorage) GetByUserID(ctx context.Context, userID string) ([]dto
 	defer rows.Close()
 	urls := make([]dto.OriginalURL, 0)
 	for rows.Next() {
-		var longURL string
+		var LongURL string
 		var alias string
-		err := rows.Scan(&longURL, &alias)
+		err := rows.Scan(&LongURL, &alias)
 		if err != nil {
 			return nil, err
 		}
-		url := dto.OriginalURL{ID: alias, URL: longURL}
+		url := dto.OriginalURL{ID: alias, URL: LongURL}
 		urls = append(urls, url)
 	}
 	if err := rows.Err(); err != nil {

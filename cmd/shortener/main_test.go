@@ -44,10 +44,10 @@ func (m *ShortenerURLServiceMock) ShortenURL(ctx context.Context, value, userID 
 	return args.String(0), args.Error(1)
 }
 
-func (m *ShortenerURLServiceMock) FindByShortened(ctx context.Context, id string) (dto.LongUrl, error) {
+func (m *ShortenerURLServiceMock) FindByShortened(ctx context.Context, id string) (dto.LongURL, error) {
 	args := m.Called(id)
-	longURL := args.String(0)
-	return dto.LongUrl{LongURL: longURL}, args.Error(1)
+	LongURL := args.String(0)
+	return dto.LongURL{LongURL: LongURL}, args.Error(1)
 }
 
 func (m *ShortenerURLServiceMock) FindByUserID(ctx context.Context, userID string) ([]dto.URL, error) {
@@ -107,8 +107,8 @@ func TestRouter(t *testing.T) {
 	ts := httptest.NewServer(r)
 	defer ts.Close()
 
-	longURLJSON := router.LongURL{URL: "http://example.com"}
-	jsonLongURLBody, err := json.Marshal(longURLJSON)
+	LongURLJSON := router.LongURL{URL: "http://example.com"}
+	jsonLongURLBody, err := json.Marshal(LongURLJSON)
 	require.NoError(t, err)
 
 	type want struct {

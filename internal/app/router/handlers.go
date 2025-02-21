@@ -34,7 +34,7 @@ func URLShortener(urlService URLService, log Logger) http.HandlerFunc {
 		}
 		defer r.Body.Close()
 
-		longURL := string(body)
+		LongURL := string(body)
 		user, err := r.Cookie(cookieName)
 		if err != nil {
 			log.Errorf("failed request %s", err)
@@ -43,7 +43,7 @@ func URLShortener(urlService URLService, log Logger) http.HandlerFunc {
 		}
 		values := strings.Split(user.Value, ":")
 		userID := values[0]
-		shortURL, err := urlService.ShortenURL(r.Context(), longURL, userID)
+		shortURL, err := urlService.ShortenURL(r.Context(), LongURL, userID)
 		if err != nil && err != services.ErrLongURLAlreadyExists {
 			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())
 			log.Error(errorString)
@@ -62,9 +62,9 @@ func URLShortener(urlService URLService, log Logger) http.HandlerFunc {
 
 func URLShortenerJSON(urlService URLService, log Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var longURL LongURL
+		var LongURL LongURL
 
-		err := json.NewDecoder(r.Body).Decode(&longURL)
+		err := json.NewDecoder(r.Body).Decode(&LongURL)
 		if err != nil {
 			log.Errorf("failed to decode request's body %s", err)
 			http.Error(w, "failed to decode request's body", http.StatusBadRequest)
@@ -78,7 +78,7 @@ func URLShortenerJSON(urlService URLService, log Logger) http.HandlerFunc {
 		}
 		values := strings.Split(user.Value, ":")
 		userID := values[0]
-		shortURL, err := urlService.ShortenURL(r.Context(), longURL.URL, userID)
+		shortURL, err := urlService.ShortenURL(r.Context(), LongURL.URL, userID)
 		if err != nil && err != services.ErrLongURLAlreadyExists {
 			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())
 			log.Error(errorString)

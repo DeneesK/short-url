@@ -28,7 +28,7 @@ type Repository interface {
 	StoreBatch(ctx context.Context, batch []dto.OriginalURL, userID string) error
 	UpdateStatusBatch([]dto.UpdateTask) error
 	GetByUserID(ctx context.Context, userID string) ([]dto.OriginalURL, error)
-	Get(context.Context, string) (dto.LongUrl, error)
+	Get(context.Context, string) (dto.LongURL, error)
 	PingDB(context.Context) error
 }
 
@@ -46,17 +46,17 @@ func NewURLShortener(storage Repository, baseAddr string, log *zap.SugaredLogger
 	}
 }
 
-func (s *URLShortener) ShortenURL(ctx context.Context, longURL, userID string) (string, error) {
+func (s *URLShortener) ShortenURL(ctx context.Context, LongURL, userID string) (string, error) {
 	var alias string
 	var err error
-	if isValid := validator.IsValidURL(longURL); !isValid {
-		return "", fmt.Errorf("this url: '%s' is not valid url", longURL)
+	if isValid := validator.IsValidURL(LongURL); !isValid {
+		return "", fmt.Errorf("this url: '%s' is not valid url", LongURL)
 	}
 
 	for i := 0; i < maxRetries; i++ {
 		alias = random.RandomString(idLength)
 
-		alias, err = s.rep.Store(ctx, alias, longURL, userID)
+		alias, err = s.rep.Store(ctx, alias, LongURL, userID)
 		if err != nil {
 			if errors.Is(err, storage.ErrNotUniqueID) {
 				continue
@@ -84,10 +84,10 @@ func (s *URLShortener) ShortenURL(ctx context.Context, longURL, userID string) (
 	return shortURL, nil
 }
 
-func (s *URLShortener) FindByShortened(ctx context.Context, id string) (dto.LongUrl, error) {
+func (s *URLShortener) FindByShortened(ctx context.Context, id string) (dto.LongURL, error) {
 	originalURL, err := s.rep.Get(ctx, id)
 	if err != nil {
-		return dto.LongUrl{}, err
+		return dto.LongURL{}, err
 	}
 	return originalURL, nil
 }

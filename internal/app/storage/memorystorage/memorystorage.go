@@ -64,12 +64,12 @@ func (s *MemoryStorage) StoreBatch(ctx context.Context, batch []dto.OriginalURL,
 	return nil
 }
 
-func (s *MemoryStorage) Get(ctx context.Context, id string) (dto.LongUrl, error) {
+func (s *MemoryStorage) Get(ctx context.Context, id string) (dto.LongURL, error) {
 	s.m.RLock()
 	defer s.m.RUnlock()
-	longUrl := s.storage[id]
+	LongURL := s.storage[id]
 	isDeleted := s.deletedURLs[id]
-	return dto.LongUrl{LongURL: longUrl, IsDeleted: isDeleted}, nil
+	return dto.LongURL{LongURL: LongURL, IsDeleted: isDeleted}, nil
 }
 
 func (s *MemoryStorage) GetByUserID(ctx context.Context, userID string) ([]dto.OriginalURL, error) {

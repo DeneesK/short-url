@@ -5,7 +5,7 @@ type OriginalURL struct {
 	URL string `json:"original_url"`
 }
 
-type LongUrl struct {
+type LongURL struct {
 	LongURL   string `json:"long_url"`
 	IsDeleted bool   `json:"is_deleted"`
 }
