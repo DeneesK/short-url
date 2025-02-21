@@ -11,8 +11,9 @@ import (
 type URLService interface {
 	ShortenURL(context.Context, string, string) (string, error)
 	StoreBatchURL(context.Context, []dto.OriginalURL, string) ([]dto.ShortedURL, error)
-	FindByShortened(context.Context, string) (string, error)
+	FindByShortened(context.Context, string) (dto.LongUrl, error)
 	FindByUserID(context.Context, string) ([]dto.URL, error)
+	DeleteBatch([]string, string)
 	PingDB(context.Context) error
 }
 
@@ -44,6 +45,8 @@ func NewRouter(urlService URLService, userService UserService, log Logger) *chi.
 	r.Get("/{id}", URLRedirect(urlService, log))
 	r.Get("/ping", PingDB(urlService, log))
 	r.Get("/api/user/urls", URLsByUser(urlService, userService, log))
+
+	r.Delete("/api/user/urls", DeleteByAlias(urlService, log))
 
 	return r
 }

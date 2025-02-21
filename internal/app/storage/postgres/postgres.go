@@ -106,18 +106,18 @@ func (s *PostgresStorage) StoreBatch(ctx context.Context, batch []dto.OriginalUR
 	return tx.Commit()
 }
 
-func (s *PostgresStorage) Get(ctx context.Context, id string) (string, error) {
+func (s *PostgresStorage) Get(ctx context.Context, id string) (dto.LongUrl, error) {
 	query := "SELECT long_url FROM shorten_url WHERE alias = $1"
-	var longURL string
+	var longURL dto.LongUrl
 	err := s.db.QueryRowContext(ctx, query, id).Scan(&longURL)
 	if err != nil {
-		return "", err
+		return dto.LongUrl{}, err
 	}
 	return longURL, nil
 }
 
 func (s *PostgresStorage) GetByUserID(ctx context.Context, userID string) ([]dto.OriginalURL, error) {
-	query := "SELECT long_url, alias FROM shorten_url WHERE user_id = $1"
+	query := "SELECT long_url, alias FROM shorten_url WHERE user_id = $1 and is_deleted = false"
 
 	rows, err := s.db.QueryContext(ctx, query, userID)
 	if err != nil {
@@ -139,6 +139,47 @@ func (s *PostgresStorage) GetByUserID(ctx context.Context, userID string) ([]dto
 		return nil, err
 	}
 	return urls, nil
+}
+
+func (s *PostgresStorage) UpdateStatusBatch(batch []dto.UpdateTask) error {
+	const chunkSize = 1000
+	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for i := 0; i < len(batch); i += chunkSize {
+		end := i + chunkSize
+		if end > len(batch) {
+			end = len(batch)
+		}
+		chunk := batch[i:end]
+
+		ids := make([]string, len(chunk))
+		userIDs := make([]string, len(chunk))
+		for i, row := range chunk {
+			ids[i] = row.ID
+			userIDs[i] = row.UserID
+		}
+
+		psql := psql.Update("shorten_url").
+			Set("is_deleted", true).
+			Where(sq.Eq{"id": ids, "user_id": userIDs})
+
+		query, args, err := psql.ToSql()
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(query, args...)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
 
 func (s *PostgresStorage) Ping(ctx context.Context) error {

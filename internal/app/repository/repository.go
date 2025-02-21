@@ -30,7 +30,8 @@ type row struct {
 type Storage interface {
 	Store(ctx context.Context, id, value, userID string) (string, error)
 	StoreBatch(ctx context.Context, batch []dto.OriginalURL, userID string) error
-	Get(ctx context.Context, id string) (string, error)
+	UpdateStatusBatch([]dto.UpdateTask) error
+	Get(context.Context, string) (dto.LongUrl, error)
 	GetByUserID(ctx context.Context, userID string) ([]dto.OriginalURL, error)
 	Close(ctx context.Context) error
 	Ping(ctx context.Context) error
@@ -145,7 +146,11 @@ func (rep *Repository) StoreBatch(ctx context.Context, batch []dto.OriginalURL, 
 	return nil
 }
 
-func (rep *Repository) Get(ctx context.Context, id string) (string, error) {
+func (rep *Repository) UpdateStatusBatch(batch []dto.UpdateTask) error {
+	return rep.storage.UpdateStatusBatch(batch)
+}
+
+func (rep *Repository) Get(ctx context.Context, id string) (dto.LongUrl, error) {
 	return rep.storage.Get(ctx, id)
 }
 

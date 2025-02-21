@@ -114,6 +114,10 @@ func URLRedirect(urlService URLService, log Logger) http.HandlerFunc {
 		}
 
 		url, err := urlService.FindByShortened(r.Context(), id)
+		if url.IsDeleted {
+			w.WriteHeader(http.StatusGone)
+			return
+		}
 		if err != nil {
 			errorString := fmt.Sprintf("failed to redirect: %s", err.Error())
 			log.Error(errorString)
@@ -121,8 +125,8 @@ func URLRedirect(urlService URLService, log Logger) http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Location", url)
-		http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+		w.Header().Set("Location", url.LongURL)
+		http.Redirect(w, r, url.LongURL, http.StatusTemporaryRedirect)
 	}
 }
 
@@ -193,6 +197,30 @@ func URLsByUser(urlService URLService, userService UserService, log Logger) http
 			log.Error(errorString)
 			http.Error(w, errorString, http.StatusBadRequest)
 		}
+	}
+}
+
+func DeleteByAlias(urlService URLService, log Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var idx []string
+
+		err := json.NewDecoder(r.Body).Decode(&idx)
+		if err != nil {
+			log.Errorf("failed to decode request's body %s", err)
+			http.Error(w, "failed to decode request's body", http.StatusBadRequest)
+			return
+		}
+		user, err := r.Cookie(cookieName)
+		if err != nil {
+			log.Errorf("failed request %s", err)
+			http.Error(w, "failed request", http.StatusBadRequest)
+			return
+		}
+
+		values := strings.Split(user.Value, ":")
+		userID := values[0]
+		urlService.DeleteBatch(idx, userID)
+		w.WriteHeader(http.StatusAccepted)
 	}
 }
 

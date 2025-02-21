@@ -16,6 +16,7 @@ type MemoryStorage struct {
 	storage               map[string]string
 	uniqueValueConstraint map[string]string
 	userIDreference       map[string][]string
+	deletedURLs           map[string]bool
 	currentBytesSize      uint64
 	maxStorageSize        uint64
 }
@@ -25,6 +26,7 @@ func NewMemoryStorage(maxStorageSize uint64) *MemoryStorage {
 		storage:               make(map[string]string),
 		uniqueValueConstraint: make(map[string]string),
 		userIDreference:       make(map[string][]string),
+		deletedURLs:           make(map[string]bool),
 		maxStorageSize:        maxStorageSize,
 	}
 }
@@ -62,10 +64,12 @@ func (s *MemoryStorage) StoreBatch(ctx context.Context, batch []dto.OriginalURL,
 	return nil
 }
 
-func (s *MemoryStorage) Get(ctx context.Context, id string) (string, error) {
+func (s *MemoryStorage) Get(ctx context.Context, id string) (dto.LongUrl, error) {
 	s.m.RLock()
 	defer s.m.RUnlock()
-	return s.storage[id], nil
+	longUrl := s.storage[id]
+	isDeleted := s.deletedURLs[id]
+	return dto.LongUrl{LongURL: longUrl, IsDeleted: isDeleted}, nil
 }
 
 func (s *MemoryStorage) GetByUserID(ctx context.Context, userID string) ([]dto.OriginalURL, error) {
@@ -78,7 +82,7 @@ func (s *MemoryStorage) GetByUserID(ctx context.Context, userID string) ([]dto.O
 		if err != nil {
 			return nil, err
 		}
-		urls = append(urls, dto.OriginalURL{ID: id, URL: originalURL})
+		urls = append(urls, dto.OriginalURL{ID: id, URL: originalURL.LongURL})
 	}
 	return urls, nil
 }
@@ -95,6 +99,21 @@ func (s *MemoryStorage) CreateUser(ctx context.Context) (string, error) {
 	newUUID := uuid.New()
 	userID := newUUID.String()
 	return userID, nil
+}
+
+func (s *MemoryStorage) UpdateStatusBatch(batch []dto.UpdateTask) error {
+	s.m.Lock()
+	defer s.m.Unlock()
+	for _, task := range batch {
+		ids := s.userIDreference[task.UserID]
+		for _, id := range ids {
+			if id == task.ID {
+				s.deletedURLs[id] = true
+				break
+			}
+		}
+	}
+	return nil
 }
 
 func (s *MemoryStorage) isIDExists(id string) bool {

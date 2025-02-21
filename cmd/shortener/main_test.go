@@ -44,9 +44,10 @@ func (m *ShortenerURLServiceMock) ShortenURL(ctx context.Context, value, userID 
 	return args.String(0), args.Error(1)
 }
 
-func (m *ShortenerURLServiceMock) FindByShortened(ctx context.Context, id string) (string, error) {
+func (m *ShortenerURLServiceMock) FindByShortened(ctx context.Context, id string) (dto.LongUrl, error) {
 	args := m.Called(id)
-	return args.String(0), args.Error(1)
+	longURL := args.String(0)
+	return dto.LongUrl{LongURL: longURL}, args.Error(1)
 }
 
 func (m *ShortenerURLServiceMock) FindByUserID(ctx context.Context, userID string) ([]dto.URL, error) {
@@ -59,6 +60,9 @@ func (m *ShortenerURLServiceMock) PingDB(ctx context.Context) error {
 
 func (m *ShortenerURLServiceMock) StoreBatchURL(ctx context.Context, batch []dto.OriginalURL, userID string) ([]dto.ShortedURL, error) {
 	return nil, nil
+}
+
+func (m *ShortenerURLServiceMock) DeleteBatch(idx []string, userID string) {
 }
 
 type userServiceMock struct {
@@ -225,7 +229,7 @@ func TestRepository_Get(t *testing.T) {
 	result, err := repo.Get(context.TODO(), "id")
 
 	assert.NoError(t, err)
-	assert.Equal(t, "url", result)
+	assert.Equal(t, "url", result.LongURL)
 }
 
 func TestRepository_StoreToFile(t *testing.T) {
@@ -269,7 +273,7 @@ func TestRepository_RestoreFromDump(t *testing.T) {
 
 	result, err := rep.Get(context.TODO(), "short1")
 	assert.NoError(t, err)
-	assert.Equal(t, "long1", result)
+	assert.Equal(t, "long1", result.LongURL)
 }
 
 func TestRepository_Close(t *testing.T) {
@@ -291,8 +295,11 @@ func TestURLShortenerService(t *testing.T) {
 	longNOTValidURL := "NOT valid url.com"
 	repo, err := repository.NewRepository(repository.StorageConfig{MaxStorageSize: 100_000})
 	assert.NoError(t, err)
-
-	ser := services.NewURLShortener(repo, baseAddr)
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		log.Fatal(err)
+	}
+	ser := services.NewURLShortener(repo, baseAddr, logger.Sugar())
 
 	t.Run("Shorten valid url", func(t *testing.T) {
 		shortURL, err := ser.ShortenURL(context.TODO(), longValidURL, "user_id")
@@ -317,6 +324,6 @@ func TestURLShortenerService(t *testing.T) {
 		id := (strings.Split(shortURL, baseAddr+"/"))[1]
 		res, err := ser.FindByShortened(context.TODO(), id)
 		assert.NoError(t, err)
-		assert.Equal(t, longValidURL2, res)
+		assert.Equal(t, longValidURL2, res.LongURL)
 	})
 }

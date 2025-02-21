@@ -32,7 +32,7 @@ func main() {
 	defer close()
 	defer rep.Close(ctx)
 
-	urlService := services.NewURLShortener(rep, conf.BaseURL)
+	urlService := services.NewURLShortener(rep, conf.BaseURL, log)
 	userService := services.NewUserService(rep, conf.SecretKey)
 	router := router.NewRouter(urlService, userService, log)
 
