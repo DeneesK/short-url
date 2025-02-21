@@ -107,7 +107,7 @@ func (s *PostgresStorage) StoreBatch(ctx context.Context, batch []dto.OriginalUR
 }
 
 func (s *PostgresStorage) Get(ctx context.Context, id string) (dto.LongUrl, error) {
-	query := "SELECT long_url FROM shorten_url WHERE alias = $1"
+	query := "SELECT long_url, is_deleted FROM shorten_url WHERE alias = $1"
 	var longURL dto.LongUrl
 	err := s.db.QueryRowContext(ctx, query, id).Scan(&longURL)
 	if err != nil {
