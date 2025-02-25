@@ -34,11 +34,11 @@ func NewUserCookieMiddleware(log Logger, userService UserService) func(http.Hand
 					http.Error(w, "failed to create user", http.StatusBadRequest)
 					return
 				}
-				setCookie(w, user)
+				setCookie(w, r, user)
 				values := strings.Split(user, ":")
 				userID := values[0]
 				ctx = context.WithValue(r.Context(), UserIDKey, userID)
-			} else if err != nil {
+			} else if err != http.ErrNoCookie && err != nil {
 				log.Errorf("failed to get cookie %s", err)
 				http.Error(w, "failed request", http.StatusBadRequest)
 				return
@@ -65,7 +65,7 @@ func NewUserVerifyMiddleware(log Logger, userService UserService) func(http.Hand
 				return
 			}
 
-			setCookie(w, user.Value) // обновляем ttl
+			setCookie(w, r, user.Value) // обновляем ttl
 
 			values := strings.Split(user.Value, ":")
 			userID := values[0]
@@ -75,11 +75,12 @@ func NewUserVerifyMiddleware(log Logger, userService UserService) func(http.Hand
 	}
 }
 
-func setCookie(w http.ResponseWriter, value string) {
+func setCookie(w http.ResponseWriter, r *http.Request, value string) {
 	cookie := &http.Cookie{
 		Name:    cookieName,
 		Value:   value,
 		Expires: time.Now().Add(cookieMaxAge),
 	}
 	http.SetCookie(w, cookie)
+	r.AddCookie(cookie)
 }

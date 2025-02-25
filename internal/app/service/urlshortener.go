@@ -165,7 +165,7 @@ func (s *URLShortener) processBatch(batch []dto.UpdateTask) {
 }
 
 func (s *URLShortener) batchWorker() {
-
+	defer s.wg.Done()
 	ticker := time.NewTicker(batchTimeout)
 	defer ticker.Stop()
 
