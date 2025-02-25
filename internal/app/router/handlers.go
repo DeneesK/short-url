@@ -5,15 +5,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 
 	"github.com/DeneesK/short-url/internal/app/dto"
-	"github.com/DeneesK/short-url/internal/app/services"
+	"github.com/DeneesK/short-url/internal/app/router/middlewares"
+	"github.com/DeneesK/short-url/internal/app/service"
 	"github.com/go-chi/chi/v5"
-)
-
-const (
-	cookieName = "user"
 )
 
 type LongURL struct {
@@ -35,21 +31,14 @@ func URLShortener(urlService URLService, log Logger) http.HandlerFunc {
 		defer r.Body.Close()
 
 		LongURL := string(body)
-		user, err := r.Cookie(cookieName)
-		if err != nil {
-			log.Errorf("failed request %s", err)
-			http.Error(w, "failed request", http.StatusBadRequest)
-			return
-		}
-		values := strings.Split(user.Value, ":")
-		userID := values[0]
+		userID := r.Context().Value(middlewares.UserIDKey).(string)
 		shortURL, err := urlService.ShortenURL(r.Context(), LongURL, userID)
-		if err != nil && err != services.ErrLongURLAlreadyExists {
+		if err != nil && err != service.ErrLongURLAlreadyExists {
 			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())
 			log.Error(errorString)
 			http.Error(w, errorString, http.StatusBadRequest)
 			return
-		} else if err == services.ErrLongURLAlreadyExists {
+		} else if err == service.ErrLongURLAlreadyExists {
 			w.Header().Set("Content-Type", "text/plain")
 			w.WriteHeader(http.StatusConflict)
 		} else {
@@ -70,21 +59,15 @@ func URLShortenerJSON(urlService URLService, log Logger) http.HandlerFunc {
 			http.Error(w, "failed to decode request's body", http.StatusBadRequest)
 			return
 		}
-		user, err := r.Cookie(cookieName)
-		if err != nil {
-			log.Errorf("failed request %s", err)
-			http.Error(w, "failed request", http.StatusBadRequest)
-			return
-		}
-		values := strings.Split(user.Value, ":")
-		userID := values[0]
+
+		userID := r.Context().Value(middlewares.UserIDKey).(string)
 		shortURL, err := urlService.ShortenURL(r.Context(), LongURL.URL, userID)
-		if err != nil && err != services.ErrLongURLAlreadyExists {
+		if err != nil && err != service.ErrLongURLAlreadyExists {
 			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())
 			log.Error(errorString)
 			http.Error(w, errorString, http.StatusBadRequest)
 			return
-		} else if err == services.ErrLongURLAlreadyExists {
+		} else if err == service.ErrLongURLAlreadyExists {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusConflict)
 		} else {
@@ -140,14 +123,7 @@ func URLShortenerBatchJSON(urlService URLService, log Logger) http.HandlerFunc {
 			http.Error(w, "failed to decode request's body", http.StatusBadRequest)
 			return
 		}
-		user, err := r.Cookie(cookieName)
-		if err != nil {
-			log.Errorf("failed request %s", err)
-			http.Error(w, "failed request", http.StatusBadRequest)
-			return
-		}
-		values := strings.Split(user.Value, ":")
-		userID := values[0]
+		userID := r.Context().Value(middlewares.UserIDKey).(string)
 		result, err := urlService.StoreBatchURL(r.Context(), batch, userID)
 		if err != nil {
 			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())
@@ -171,14 +147,7 @@ func URLShortenerBatchJSON(urlService URLService, log Logger) http.HandlerFunc {
 
 func URLsByUser(urlService URLService, userService UserService, log Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		user, err := r.Cookie(cookieName)
-		if err != nil {
-			log.Errorf("failed to get cookie %s", err)
-			http.Error(w, "failed request", http.StatusBadRequest)
-			return
-		}
-		values := strings.Split(user.Value, ":")
-		userID := values[0]
+		userID := r.Context().Value(middlewares.UserIDKey).(string)
 		urls, err := urlService.FindByUserID(r.Context(), userID)
 		if err != nil {
 			log.Errorf("failed request %s", err)
@@ -210,15 +179,7 @@ func DeleteByAlias(urlService URLService, log Logger) http.HandlerFunc {
 			http.Error(w, "failed to decode request's body", http.StatusBadRequest)
 			return
 		}
-		user, err := r.Cookie(cookieName)
-		if err != nil {
-			log.Errorf("failed request %s", err)
-			http.Error(w, "failed request", http.StatusBadRequest)
-			return
-		}
-
-		values := strings.Split(user.Value, ":")
-		userID := values[0]
+		userID := r.Context().Value(middlewares.UserIDKey).(string)
 		urlService.DeleteBatch(idx, userID)
 		w.WriteHeader(http.StatusAccepted)
 	}

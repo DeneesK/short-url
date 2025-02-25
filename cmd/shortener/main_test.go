@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,7 +15,7 @@ import (
 	"github.com/DeneesK/short-url/internal/app/dto"
 	"github.com/DeneesK/short-url/internal/app/repository"
 	"github.com/DeneesK/short-url/internal/app/router"
-	"github.com/DeneesK/short-url/internal/app/services"
+	services "github.com/DeneesK/short-url/internal/app/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -94,7 +93,7 @@ func TestRouter(t *testing.T) {
 	rep := &ShortenerURLServiceMock{}
 	logger, err := zap.NewDevelopment()
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err.Error())
 	}
 
 	rep.On("ShortenURL", "http://example.com").Return(testID, nil)
@@ -297,7 +296,7 @@ func TestURLShortenerService(t *testing.T) {
 	assert.NoError(t, err)
 	logger, err := zap.NewDevelopment()
 	if err != nil {
-		log.Fatal(err)
+		logger.Fatal(err.Error())
 	}
 	ser := services.NewURLShortener(repo, baseAddr, logger.Sugar())
 

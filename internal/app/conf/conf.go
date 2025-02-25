@@ -1,6 +1,7 @@
 package conf
 
 import (
+	"cmp"
 	"flag"
 	"log"
 	"os"
@@ -65,8 +66,7 @@ func MustLoad() *ServerConf {
 	}
 	if secret, ok := os.LookupEnv("SECRET_KEY"); ok {
 		cfg.SecretKey = secret
-	} else if cfg.Env == "dev" {
-		cfg.SecretKey = "secret_key"
 	}
+	cfg.SecretKey = cmp.Or(cfg.SecretKey, "secret_key")
 	return &cfg
 }

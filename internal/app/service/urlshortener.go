@@ -1,10 +1,11 @@
-package services
+package service
 
 import (
 	"context"
 	"errors"
 	"fmt"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/DeneesK/short-url/internal/app/dto"
@@ -17,10 +18,13 @@ import (
 var ErrLongURLAlreadyExists = errors.New("long URL already exists")
 
 const (
-	maxRetries = 3
-	numWorkers = 3
-	idLength   = 8
-	sleepTime  = 100
+	maxRetries   = 3
+	numWorkers   = 3
+	idLength     = 8
+	sleepTime    = 100
+	chanSize     = 1000
+	batchSize    = 1000
+	batchTimeout = 500 * time.Millisecond
 )
 
 type Repository interface {
@@ -36,21 +40,31 @@ type URLShortener struct {
 	rep      Repository
 	baseAddr string
 	log      *zap.SugaredLogger
+	updateCh chan dto.UpdateTask
+	wg       sync.WaitGroup
 }
 
 func NewURLShortener(storage Repository, baseAddr string, log *zap.SugaredLogger) *URLShortener {
-	return &URLShortener{
+	s := &URLShortener{
 		rep:      storage,
 		baseAddr: baseAddr,
 		log:      log,
+		updateCh: make(chan dto.UpdateTask, chanSize),
 	}
+
+	for i := 0; i < numWorkers; i++ {
+		s.wg.Add(1)
+		go s.batchWorker()
+	}
+
+	return s
 }
 
 func (s *URLShortener) ShortenURL(ctx context.Context, LongURL, userID string) (string, error) {
 	var alias string
 	var err error
 	if isValid := validator.IsValidURL(LongURL); !isValid {
-		return "", fmt.Errorf("this url: '%s' is not valid url", LongURL)
+		return "", fmt.Errorf("this url: %q is not valid url", LongURL)
 	}
 
 	for i := 0; i < maxRetries; i++ {
@@ -134,37 +148,55 @@ func (s *URLShortener) StoreBatchURL(ctx context.Context, batch []dto.OriginalUR
 }
 
 func (s *URLShortener) DeleteBatch(idx []string, userID string) {
-	updateCh := s.addToUpdate(idx, userID)
-	s.startStatusUpdater(updateCh)
-
+	for _, id := range idx {
+		s.updateCh <- dto.UpdateTask{UserID: userID, ID: id}
+	}
 }
 
 func (s *URLShortener) PingDB(ctx context.Context) error {
 	return s.rep.PingDB(ctx)
 }
 
-func (s *URLShortener) startStatusUpdater(updateCh chan dto.UpdateTask) {
-	for i := 0; i < numWorkers; i++ {
-		go s.executeBatchUpdate(updateCh)
-	}
-}
-
-func (s *URLShortener) addToUpdate(idx []string, userID string) chan dto.UpdateTask {
-	updateCh := make(chan dto.UpdateTask, len(idx))
-	defer close(updateCh)
-	for _, id := range idx {
-		updateCh <- dto.UpdateTask{UserID: userID, ID: id}
-	}
-	return updateCh
-}
-
-func (s *URLShortener) executeBatchUpdate(updateCh chan dto.UpdateTask) {
-	batch := make([]dto.UpdateTask, 0)
-	for task := range updateCh {
-		batch = append(batch, task)
-	}
+func (s *URLShortener) processBatch(batch []dto.UpdateTask) {
 	err := s.rep.UpdateStatusBatch(batch)
 	if err != nil {
-		s.log.Errorf("during attempt of batch status updating: %s", err.Error())
+		s.log.Errorf("failed to update batch: %v", err)
 	}
+}
+
+func (s *URLShortener) batchWorker() {
+
+	ticker := time.NewTicker(batchTimeout)
+	defer ticker.Stop()
+
+	batch := make([]dto.UpdateTask, 0, batchSize)
+
+	for {
+		select {
+		case task, ok := <-s.updateCh:
+			if !ok {
+				if len(batch) > 0 {
+					s.processBatch(batch)
+				}
+				return
+			}
+			batch = append(batch, task)
+
+			if len(batch) >= batchSize {
+				s.processBatch(batch)
+				batch = make([]dto.UpdateTask, 0, batchSize)
+			}
+
+		case <-ticker.C:
+			if len(batch) > 0 {
+				s.processBatch(batch)
+				batch = make([]dto.UpdateTask, 0, batchSize)
+			}
+		}
+	}
+}
+
+func (s *URLShortener) Shutdown() {
+	close(s.updateCh)
+	s.wg.Wait()
 }

@@ -11,6 +11,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/lib/pq"
 
 	"github.com/DeneesK/short-url/internal/app/dto"
 	"github.com/DeneesK/short-url/internal/app/storage"
@@ -143,7 +144,6 @@ func (s *PostgresStorage) GetByUserID(ctx context.Context, userID string) ([]dto
 
 func (s *PostgresStorage) UpdateStatusBatch(batch []dto.UpdateTask) error {
 	const chunkSize = 1000
-	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
 
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -158,22 +158,21 @@ func (s *PostgresStorage) UpdateStatusBatch(batch []dto.UpdateTask) error {
 		}
 		chunk := batch[i:end]
 
-		ids := make([]string, len(chunk))
+		aliases := make([]string, len(chunk))
 		userIDs := make([]string, len(chunk))
 		for i, row := range chunk {
-			ids[i] = row.ID
+			aliases[i] = row.ID
 			userIDs[i] = row.UserID
 		}
 
-		psql := psql.Update("shorten_url").
-			Set("is_deleted", true).
-			Where(sq.Eq{"alias": ids, "user_id": userIDs})
-
-		query, args, err := psql.ToSql()
-		if err != nil {
-			return err
-		}
-		_, err = tx.Exec(query, args...)
+		query := `
+			UPDATE shorten_url
+			SET is_deleted = true
+			WHERE (alias, user_id) IN (
+				SELECT unnest($1::text[]), unnest($2::uuid[])
+			)
+		`
+		_, err = tx.Exec(query, pq.Array(aliases), pq.Array(userIDs))
 		if err != nil {
 			return err
 		}
