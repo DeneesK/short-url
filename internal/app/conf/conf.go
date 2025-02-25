@@ -1,6 +1,7 @@
 package conf
 
 import (
+	"cmp"
 	"flag"
 	"log"
 	"os"
@@ -17,6 +18,7 @@ type ServerConf struct {
 	DBDSN                 string
 	MigrationsPath        string
 	MemoryUsageLimitBytes uint64
+	SecretKey             string
 }
 
 var cfg ServerConf
@@ -62,6 +64,9 @@ func MustLoad() *ServerConf {
 	if dbURL, ok := os.LookupEnv("DATABASE_DSN"); ok {
 		cfg.DBDSN = dbURL
 	}
-
+	if secret, ok := os.LookupEnv("SECRET_KEY"); ok {
+		cfg.SecretKey = secret
+	}
+	cfg.SecretKey = cmp.Or(cfg.SecretKey, "secret_key")
 	return &cfg
 }

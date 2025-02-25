@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/DeneesK/short-url/internal/app/dto"
+	"github.com/DeneesK/short-url/internal/app/router/middlewares"
 	"github.com/DeneesK/short-url/internal/app/service"
 	"github.com/go-chi/chi/v5"
 )
@@ -29,9 +30,9 @@ func URLShortener(urlService URLService, log Logger) http.HandlerFunc {
 		}
 		defer r.Body.Close()
 
-		longURL := string(body)
-
-		shortURL, err := urlService.ShortenURL(r.Context(), longURL)
+		LongURL := string(body)
+		userID := r.Context().Value(middlewares.UserIDKey).(string)
+		shortURL, err := urlService.ShortenURL(r.Context(), LongURL, userID)
 		if err != nil && err != service.ErrLongURLAlreadyExists {
 			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())
 			log.Error(errorString)
@@ -50,16 +51,17 @@ func URLShortener(urlService URLService, log Logger) http.HandlerFunc {
 
 func URLShortenerJSON(urlService URLService, log Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var longURL LongURL
+		var LongURL LongURL
 
-		err := json.NewDecoder(r.Body).Decode(&longURL)
+		err := json.NewDecoder(r.Body).Decode(&LongURL)
 		if err != nil {
 			log.Errorf("failed to decode request's body %s", err)
 			http.Error(w, "failed to decode request's body", http.StatusBadRequest)
 			return
 		}
 
-		shortURL, err := urlService.ShortenURL(r.Context(), longURL.URL)
+		userID := r.Context().Value(middlewares.UserIDKey).(string)
+		shortURL, err := urlService.ShortenURL(r.Context(), LongURL.URL, userID)
 		if err != nil && err != service.ErrLongURLAlreadyExists {
 			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())
 			log.Error(errorString)
@@ -95,6 +97,10 @@ func URLRedirect(urlService URLService, log Logger) http.HandlerFunc {
 		}
 
 		url, err := urlService.FindByShortened(r.Context(), id)
+		if url.IsDeleted {
+			w.WriteHeader(http.StatusGone)
+			return
+		}
 		if err != nil {
 			errorString := fmt.Sprintf("failed to redirect: %s", err.Error())
 			log.Error(errorString)
@@ -102,8 +108,8 @@ func URLRedirect(urlService URLService, log Logger) http.HandlerFunc {
 			return
 		}
 
-		w.Header().Set("Location", url)
-		http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+		w.Header().Set("Location", url.LongURL)
+		http.Redirect(w, r, url.LongURL, http.StatusTemporaryRedirect)
 	}
 }
 
@@ -117,8 +123,8 @@ func URLShortenerBatchJSON(urlService URLService, log Logger) http.HandlerFunc {
 			http.Error(w, "failed to decode request's body", http.StatusBadRequest)
 			return
 		}
-
-		result, err := urlService.StoreBatchURL(r.Context(), batch)
+		userID := r.Context().Value(middlewares.UserIDKey).(string)
+		result, err := urlService.StoreBatchURL(r.Context(), batch, userID)
 		if err != nil {
 			errorString := fmt.Sprintf("failed to create short url: %s", err.Error())
 			log.Error(errorString)
@@ -136,6 +142,46 @@ func URLShortenerBatchJSON(urlService URLService, log Logger) http.HandlerFunc {
 			http.Error(w, errorString, http.StatusBadRequest)
 			return
 		}
+	}
+}
+
+func URLsByUser(urlService URLService, userService UserService, log Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID := r.Context().Value(middlewares.UserIDKey).(string)
+		urls, err := urlService.FindByUserID(r.Context(), userID)
+		if err != nil {
+			log.Errorf("failed request %s", err)
+			http.Error(w, "failed request", http.StatusBadRequest)
+			return
+		}
+		if len(urls) == 0 {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		err = json.NewEncoder(w).Encode(urls)
+		if err != nil {
+			errorString := fmt.Sprintf("failed to encode: %s", err.Error())
+			log.Error(errorString)
+			http.Error(w, errorString, http.StatusBadRequest)
+		}
+	}
+}
+
+func DeleteByAlias(urlService URLService, log Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var idx []string
+
+		err := json.NewDecoder(r.Body).Decode(&idx)
+		if err != nil {
+			log.Errorf("failed to decode request's body %s", err)
+			http.Error(w, "failed to decode request's body", http.StatusBadRequest)
+			return
+		}
+		userID := r.Context().Value(middlewares.UserIDKey).(string)
+		urlService.DeleteBatch(idx, userID)
+		w.WriteHeader(http.StatusAccepted)
 	}
 }
 
